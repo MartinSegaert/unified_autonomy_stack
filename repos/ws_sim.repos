@@ -11,7 +11,3 @@ repositories:
     type: git
     url: git@github.com:ntnu-arl/ugv_gz.git
     version: dev/unified_autonomy_stack
-  src/helicopter_bridge:
-    type: git
-    url: git@github.com:ntnu-arl/helicopter_bridge.git
-    version: main
