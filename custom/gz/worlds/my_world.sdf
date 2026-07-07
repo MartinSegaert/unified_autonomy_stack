@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sdf version="1.9">
   <world name="map">
-    <physics type="ode">
-      <max_step_size>0.004</max_step_size>
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
-      <real_time_update_rate>250</real_time_update_rate>
     </physics>
 
     <plugin filename="libgz-sim-physics-system.so" name="gz::sim::systems::Physics"/>
@@ -28,27 +27,19 @@
     <model name="ground_plane">
       <static>true</static>
       <link name="link">
+        <pose>0 0 -0.05 0 0 0</pose>
         <collision name="collision">
           <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>1 1</size>
-            </plane>
+            <box>
+              <size>500 500 0.1</size>
+            </box>
           </geometry>
-          <surface>
-            <friction>
-              <ode/>
-            </friction>
-            <bounce/>
-            <contact/>
-          </surface>
         </collision>
         <visual name="visual">
           <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>500 500</size>
-            </plane>
+            <box>
+              <size>500 500 0.1</size>
+            </box>
           </geometry>
           <material>
             <ambient>0.8 0.8 0.8 1</ambient>
@@ -56,19 +47,6 @@
             <specular>0.8 0.8 0.8 1</specular>
           </material>
         </visual>
-        <pose>0 0 0 0 -0 0</pose>
-        <inertial>
-          <pose>0 0 0 0 -0 0</pose>
-          <mass>1</mass>
-          <inertia>
-            <ixx>1</ixx>
-            <ixy>0</ixy>
-            <ixz>0</ixz>
-            <iyy>1</iyy>
-            <iyz>0</iyz>
-            <izz>1</izz>
-          </inertia>
-        </inertial>
         <enable_wind>false</enable_wind>
       </link>
       <pose>0 0 0 0 -0 0</pose>
