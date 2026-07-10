@@ -1,4 +1,8 @@
-workspaces/
+
+workspaces/*
+!workspaces/robot_bringup/
+!workspaces/robot_bringup/**
+
 .vscode/**
 docker-compose.build_images.yml
 data/
