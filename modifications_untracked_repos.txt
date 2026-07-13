@@ -1,0 +1,1 @@
+workspaces/ws_nmpc/src/sdf_nmpc_ros/scripts/sdfnmpc_node.py : auto start 2D and 3D visualization
