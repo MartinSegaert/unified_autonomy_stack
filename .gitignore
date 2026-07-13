@@ -1,7 +1,11 @@
 
 workspaces/*
+
 !workspaces/robot_bringup/
 !workspaces/robot_bringup/**
+
+!workspaces/ws_gbplanner/gbplanner_ros/
+!workspaces/ws_gbplanner/gbplanner_ros/**
 
 .vscode/**
 docker-compose.build_images.yml

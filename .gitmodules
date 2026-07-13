@@ -1,3 +1,6 @@
 [submodule "workspaces/robot_bringup"]
 	path = workspaces/robot_bringup
 	url = git@github.com:ntnu-arl/robot_bringup.git
+[submodule "workspaces/ws_gbplanner/src/exploration/gbplanner_ros"]
+	path = workspaces/ws_gbplanner/src/exploration/gbplanner_ros
+	url = git@github.com:MartinSegaert/gbplanner_ros.git
