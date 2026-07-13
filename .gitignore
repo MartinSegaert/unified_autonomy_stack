@@ -7,3 +7,5 @@ workspaces/*
 docker-compose.build_images.yml
 data/
 logs/
+
+*.pyc

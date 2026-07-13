@@ -108,7 +108,7 @@ services:
     <<: [*ros2-launch-template]
     image: unified_autonomy:ros2_sim
     runtime: nvidia
-    command: ros2 launch robot_bringup uav_sim_custom.launch.xml rviz:=true
+    command: ros2 launch /workspace/src/robot_bringup/launch/ros2/uav_sim_custom.launch.xml rviz:=true rviz_config:=/workspace/src/robot_bringup/rviz/ros1/custom_goal_velocity.rviz
     # command: ros2 launch robot_bringup uav_sim_unipilot.launch.xml
     privileged: true
     volumes:
