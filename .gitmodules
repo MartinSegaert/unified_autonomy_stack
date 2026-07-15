@@ -4,3 +4,6 @@
 [submodule "workspaces/ws_gbplanner/src/exploration/gbplanner_ros"]
 	path = workspaces/ws_gbplanner/src/exploration/gbplanner_ros
 	url = git@github.com:MartinSegaert/gbplanner_ros.git
+[submodule "workspaces/PX4"]
+	path = workspaces/PX4
+	url = git@github.com:PX4/PX4-Autopilot.git
