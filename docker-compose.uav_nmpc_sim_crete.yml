@@ -140,6 +140,7 @@ services:
       # PX4 sends Gazebo an SDF include containing this absolute path. Mount it
       # at the same location in both the Gazebo and PX4 containers.
       - ./workspaces/PX4:/repo/workspaces/PX4:ro
+      - ./workspaces/robot_bringup/gz/models/x500_3d_lidar:/repo/workspaces/PX4/Tools/simulation/gz/models/x500_3d_lidar:ro
     devices:
       - /dev/dri:/dev/dri
     environment:
@@ -177,7 +178,7 @@ services:
   ros2_launch_px4_sitl:
     <<: *ros2-launch-template
     image: unified_autonomy:ros2_px4_sim
-    command: bash -c "cd /repo/workspaces/PX4 && make px4_sitl gz_x500"
+    command: bash -c "cd /repo/workspaces/PX4 && make px4_sitl gz_x500_3d_lidar"
     depends_on:
       ros2_launch_uav_sim:
         # PX4_GZ_STANDALONE invokes PX4's own scene/info readiness loop. Start
@@ -191,6 +192,7 @@ services:
       # a ../../../../workspaces/PX4 worktree. Mounting both below /repo keeps
       # those relative paths valid inside the container.
       - ./.git/modules/workspaces/PX4:/repo/.git/modules/workspaces/PX4:ro
+      - ./workspaces/robot_bringup/gz/models/x500_3d_lidar:/repo/workspaces/PX4/Tools/simulation/gz/models/x500_3d_lidar:ro
     environment:
       - ROS_DOMAIN_ID=${DOMAIN_ID}
       - PX4_GZ_STANDALONE=1
@@ -203,7 +205,7 @@ services:
       - GZ_PARTITION=${GZ_PARTITION:-uas_px4_crete}
       - GZ_IP=127.0.0.1
     healthcheck:
-      test: ["CMD-SHELL", "gz topic -l | grep -q '/world/map/model/x500_0/link/base_link/sensor/imu_sensor/imu'"]
+      test: ["CMD-SHELL", "topics=$$(gz topic -l) && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_0/link/base_link/sensor/imu_sensor/imu' && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_0/link/base_link/sensor/air_pressure_sensor/air_pressure' && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_0/link/base_link/sensor/magnetometer_sensor/magnetometer' && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_0/link/base_link/sensor/navsat_sensor/navsat'"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -254,6 +256,8 @@ services:
       -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/sdf_nmpc/cmd/acc}
       -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
       -p body_frame_id:=${PX4_BODY_FRAME:-rmf/base_link}
+      -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
+      -p auto_arm:=${PX4_AUTO_ARM:-true}
     volumes:
       - *robot-bringup-volume
     environment:
