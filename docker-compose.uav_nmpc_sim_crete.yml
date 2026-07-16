@@ -253,7 +253,7 @@ services:
     command: >
       python3 /workspace/src/robot_bringup/scripts/ros2/px4_mavros_bridge.py
       --ros-args
-      -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/sdf_nmpc/cmd/acc}
+      -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/rmf/cmd/acc}
       -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
       -p body_frame_id:=${PX4_BODY_FRAME:-base_link}
       -p use_sim_time:=true
@@ -288,7 +288,7 @@ services:
       - ACADOS_SOURCE_DIR=/home/developer/acados
       - LD_LIBRARY_PATH=/usr/local/lib:/home/developer/acados/lib:${LD_LIBRARY_PATH}
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 launch robot_bringup nmpc_full.launch.py output_topic:=/sdf_nmpc/cmd/acc"
+    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 launch robot_bringup nmpc_custom_px4.launch.py output_topic:=/sdf_nmpc/cmd/acc"
     volumes:
       - ./workspaces/ws_nmpc:/workspace
       - *robot-bringup-volume
