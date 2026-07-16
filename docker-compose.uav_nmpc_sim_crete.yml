@@ -256,9 +256,15 @@ services:
       -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/sdf_nmpc/cmd/acc}
       -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
       -p body_frame_id:=${PX4_BODY_FRAME:-base_link}
+      -p use_sim_time:=true
       -p publish_tf:=${PX4_PUBLISH_TF:-true}
+      -p stamp_tf_with_ros_time:=${PX4_STAMP_TF_WITH_ROS_TIME:-true}
       -p tf_parent_frame_id:=${PX4_TF_PARENT_FRAME:-world}
       -p tf_child_frame_id:=${PX4_TF_CHILD_FRAME:-base_link}
+      -p publish_lidar_tf:=${PX4_PUBLISH_LIDAR_TF:-true}
+      -p lidar_parent_frame_id:=${PX4_LIDAR_PARENT_FRAME:-base_link}
+      -p lidar_child_frame_id:=${PX4_LIDAR_CHILD_FRAME:-lidar_link}
+      -p lidar_z_offset_m:=${PX4_LIDAR_Z_OFFSET_M:-0.1}
       -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
       -p auto_arm:=${PX4_AUTO_ARM:-true}
     volumes:
