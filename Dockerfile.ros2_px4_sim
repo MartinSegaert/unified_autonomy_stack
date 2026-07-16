@@ -1,0 +1,76 @@
+# PX4 SITL build/runtime image for the Gazebo Harmonic simulation stack.
+#
+# PX4 itself is mounted from workspaces/PX4 by docker compose. Keeping the
+# source tree outside the image means submodule updates do not require this
+# dependency image to be rebuilt, and the host-side PX4 build cache survives
+# container recreation.
+
+ARG BASE_IMAGE=unified_autonomy:ros2_sim
+FROM ${BASE_IMAGE}
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# ros2_sim ends as USER developer. PX4 SITL needs the general build tools,
+# Gazebo development libraries already supplied by ros2_sim, and the Python
+# packages used by its generators.
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        astyle \
+        bc \
+        ccache \
+        cppcheck \
+        file \
+        gdb \
+        lcov \
+        libeigen3-dev \
+        libopencv-dev \
+        libssl-dev \
+        libxml2-dev \
+        libxml2-utils \
+        ninja-build \
+        protobuf-compiler \
+        python3-dev \
+        python3-pip \
+        python3-setuptools \
+        python3-wheel \
+        ros-humble-mavros \
+        ros-humble-mavros-extras \
+        rsync \
+        shellcheck \
+        unzip \
+        zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# diagnostic_updater 4.0.6 is header-only, but the current Humble MAVROS
+# package still links against its former shared-library ABI. Build the two
+# inline symbols MAVROS needs into the expected SONAME.
+COPY docker/diagnostic_updater_abi_compat.cpp /tmp/
+RUN bash -c 'source /opt/ros/humble/setup.bash && \
+    include_flags=(-I/opt/ros/humble/include); \
+    for include_dir in /opt/ros/humble/include/*; do \
+      [ -d "$include_dir" ] && include_flags+=("-I$include_dir"); \
+    done; \
+    g++ -std=c++17 -fPIC -shared \
+      -Wl,-soname,libdiagnostic_updater.so \
+      "${include_flags[@]}" \
+      /tmp/diagnostic_updater_abi_compat.cpp \
+      -L/opt/ros/humble/lib \
+      -lrclcpp \
+      -ldiagnostic_msgs__rosidl_typesupport_cpp \
+      -o /opt/ros/humble/lib/libdiagnostic_updater.so; \
+    rm /tmp/diagnostic_updater_abi_compat.cpp'
+
+# MAVROS requires the GeographicLib geoid datasets at runtime. The installer
+# is supplied by the ros-humble-mavros package above.
+RUN /opt/ros/humble/lib/mavros/install_geographiclib_datasets.sh
+
+COPY workspaces/PX4/Tools/setup/requirements.txt /tmp/px4-requirements.txt
+RUN pip3 install --no-cache-dir -r /tmp/px4-requirements.txt \
+    && rm /tmp/px4-requirements.txt
+
+USER developer
+WORKDIR /repo/workspaces/PX4
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]

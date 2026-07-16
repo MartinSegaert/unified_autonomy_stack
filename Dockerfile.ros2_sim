@@ -17,8 +17,7 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
     gz-harmonic \
     ros-humble-ros-gzharmonic \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-file update
+    && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies for building gz-sim from source
 RUN apt-get update && apt-get install -y \
@@ -39,8 +38,7 @@ RUN apt-get update && apt-get install -y \
     libgz-transport13-dev \
     libgz-utils2-dev \
     libsdformat14-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-file update
+    && rm -rf /var/lib/apt/lists/*
 
 # Clone and build forked gz-sim
 WORKDIR /tmp/gz-sim-build
@@ -88,8 +86,7 @@ RUN apt-get update && apt-get install -y \
     ros-humble-nav-msgs \
     ros-humble-geometry-msgs \
     # Clean up
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-file update
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies for robot control scripts
 RUN pip3 install --no-cache-dir \

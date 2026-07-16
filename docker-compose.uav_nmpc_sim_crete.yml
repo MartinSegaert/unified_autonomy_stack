@@ -130,13 +130,16 @@ services:
     <<: [*ros2-launch-template]
     image: unified_autonomy:ros2_sim
     runtime: nvidia
-    command: ros2 launch robot_bringup uav_sim_crete.launch.xml
-    # command: ros2 launch robot_bringup uav_sim_unipilot.launch.xml
+    # Start only the Crete world. PX4 SITL spawns and controls the x500.
+    command: ros2 launch robot_bringup uav_sim_crete_px4.launch.xml headless:=${GZ_HEADLESS:-false}
     privileged: true
     volumes:
       - *x11-volume
       - ./workspaces/ws_sim:/workspace
       - *robot-bringup-volume
+      # PX4 sends Gazebo an SDF include containing this absolute path. Mount it
+      # at the same location in both the Gazebo and PX4 containers.
+      - ./workspaces/PX4:/repo/workspaces/PX4:ro
     devices:
       - /dev/dri:/dev/dri
     environment:
@@ -147,6 +150,19 @@ services:
       - __NV_PRIME_RENDER_OFFLOAD=${__NV_PRIME_RENDER_OFFLOAD:-1}
       - __GLX_VENDOR_LIBRARY_NAME=${__GLX_VENDOR_LIBRARY_NAME:-nvidia}
       - LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-0}
+      # Explicit values are required for Gazebo Transport discovery across
+      # containers, even though both services use the host network.
+      - GZ_PARTITION=${GZ_PARTITION:-uas_px4_crete}
+      - GZ_IP=127.0.0.1
+    healthcheck:
+      # Gazebo Transport discovery can exceed Docker's short health timeout.
+      # PX4 performs its own /world/map/scene/info readiness check before it
+      # spawns the vehicle, so container health only needs server liveness.
+      test: ["CMD-SHELL", "pgrep -f 'gz sim server' >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 10s
     deploy:
       resources:
         reservations:
@@ -154,6 +170,94 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+  # PX4 owns the x500 attitude/rate/motor control and communicates with
+  # Gazebo directly over gz-transport. The first launch builds px4_sitl_default
+  # in the mounted submodule; subsequent launches reuse workspaces/PX4/build.
+  ros2_launch_px4_sitl:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_px4_sim
+    command: bash -c "cd /repo/workspaces/PX4 && make px4_sitl gz_x500"
+    depends_on:
+      ros2_launch_uav_sim:
+        # PX4_GZ_STANDALONE invokes PX4's own scene/info readiness loop. Start
+        # PX4 as soon as Gazebo starts so a brittle Compose probe can never
+        # prevent the model-spawn code from running.
+        condition: service_started
+    volumes:
+      - ./workspaces/PX4:/repo/workspaces/PX4:rw
+      # workspaces/PX4 is a git submodule. Its .git file contains
+      # "gitdir: ../../.git/modules/workspaces/PX4" and its metadata records
+      # a ../../../../workspaces/PX4 worktree. Mounting both below /repo keeps
+      # those relative paths valid inside the container.
+      - ./.git/modules/workspaces/PX4:/repo/.git/modules/workspaces/PX4:ro
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+      - PX4_GZ_STANDALONE=1
+      # The Crete SDF world is named 'map', not 'crete'. Without this override
+      # the x500 airframe defaults to a world named 'default'.
+      - PX4_GZ_WORLD=map
+      - PX4_GZ_MODEL_POSE=${PX4_GZ_MODEL_POSE:-0,0,0,0,0,0}
+      - PX4_GZ_NO_FOLLOW=${PX4_GZ_NO_FOLLOW:-1}
+      - GIT_SUBMODULES_ARE_EVIL=1
+      - GZ_PARTITION=${GZ_PARTITION:-uas_px4_crete}
+      - GZ_IP=127.0.0.1
+    healthcheck:
+      test: ["CMD-SHELL", "gz topic -l | grep -q '/world/map/model/x500_0/link/base_link/sensor/imu_sensor/imu'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 180s
+    stop_grace_period: 10s
+
+  # MAVROS binds the port to which PX4's first SITL instance sends its
+  # offboard MAVLink stream (PX4 local 14580 -> MAVROS local 14540).
+  ros2_launch_mavros:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_px4_sim
+    depends_on:
+      ros2_launch_px4_sitl:
+        condition: service_healthy
+    command: >
+      bash -c "source /opt/ros/humble/setup.bash &&
+      ros2 run mavros mavros_node --ros-args
+      --params-file /opt/ros/humble/share/mavros/launch/px4_pluginlists.yaml
+      --params-file /opt/ros/humble/share/mavros/launch/px4_config.yaml
+      -p fcu_url:=udp://0.0.0.0:14540@127.0.0.1:14580
+      -p tgt_system:=1
+      -p tgt_component:=1
+      -r __ns:=/mavros"
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+    healthcheck:
+      # A new `ros2 topic echo` process can exceed Docker's timeout while DDS
+      # discovery warms up even though MAVROS is already connected. Gate the
+      # bridge on node liveness; it can safely wait for the first FCU heartbeat.
+      test: ["CMD-SHELL", "pgrep -f '/opt/ros/humble/lib/mavros/mavros_node' >/dev/null"]
+      interval: 5s
+      timeout: 2s
+      retries: 30
+      start_period: 10s
+
+  # The existing NMPC simulation interface emits geometry_msgs/Twist. Convert
+  # it to MAVLink acceleration setpoints and expose MAVROS odometry under the
+  # robot topic expected by the rest of this stack.
+  ros2_launch_px4_mavros_bridge:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_px4_sim
+    depends_on:
+      ros2_launch_mavros:
+        condition: service_healthy
+    command: >
+      python3 /workspace/src/robot_bringup/scripts/ros2/px4_mavros_bridge.py
+      --ros-args
+      -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/sdf_nmpc/cmd/acc}
+      -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
+      -p body_frame_id:=${PX4_BODY_FRAME:-rmf/base_link}
+    volumes:
+      - *robot-bringup-volume
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
 
 
   # # # ==================== NMPC ====================

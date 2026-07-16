@@ -22,7 +22,6 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libgl1-mesa-dri \
     bash-completion \
-    apt-file \
     net-tools \
     iputils-ping \
     iputils-tracepath \
@@ -41,15 +40,13 @@ RUN apt-get update && apt-get install -y \
     unzip \
     software-properties-common \
     v4l-utils \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-file update
+    && rm -rf /var/lib/apt/lists/*
 
 # Dependancies for mavlink and mavros. This should be removed once mavros version 1.22 is available from apt https://github.com/mavlink/mavros/milestone/68 at which point we dont need to build mavros and mavlink from source anymore.
 RUN apt-get update && apt-get install -y \
     libgeographic-dev \
     geographiclib-tools \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-file update
+    && rm -rf /var/lib/apt/lists/*
 RUN pip3 install future
 
 
@@ -61,14 +58,12 @@ RUN apt-get update && apt-get install -y \
     libjson-glib-dev \
     ros-humble-ament-cmake-clang-format \
     ros-humble-osrf-testing-tools-cpp \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-file update
+    && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y \
     ros-humble-control-msgs \
     ros-humble-mavros-msgs\
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-file update
+    && rm -rf /var/lib/apt/lists/*
 
 ENV SHELL=/bin/bash
 
