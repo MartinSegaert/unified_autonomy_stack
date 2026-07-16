@@ -255,7 +255,10 @@ services:
       --ros-args
       -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/sdf_nmpc/cmd/acc}
       -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
-      -p body_frame_id:=${PX4_BODY_FRAME:-rmf/base_link}
+      -p body_frame_id:=${PX4_BODY_FRAME:-base_link}
+      -p publish_tf:=${PX4_PUBLISH_TF:-true}
+      -p tf_parent_frame_id:=${PX4_TF_PARENT_FRAME:-world}
+      -p tf_child_frame_id:=${PX4_TF_CHILD_FRAME:-base_link}
       -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
       -p auto_arm:=${PX4_AUTO_ARM:-true}
     volumes:
