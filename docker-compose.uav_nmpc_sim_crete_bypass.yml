@@ -65,11 +65,11 @@ services:
       -p lookahead_distance_m:=${PX4_PATH_LOOKAHEAD_M:-1.5}
       -p max_speed_mps:=${PX4_PATH_MAX_SPEED_MPS:-1.5}
       -p min_turn_speed_mps:=${PX4_PATH_MIN_TURN_SPEED_MPS:-0.45}
-      -p max_acceleration_mps2:=${PX4_PATH_MAX_ACCEL_MPS2:-0.8}
-      -p max_deceleration_mps2:=${PX4_PATH_MAX_DECEL_MPS2:-1.2}
+      -p max_acceleration_mps2:=${PX4_PATH_MAX_ACCEL_MPS2:-2.0}
+      -p max_deceleration_mps2:=${PX4_PATH_MAX_DECEL_MPS2:-2.0}
       -p slowdown_distance_m:=${PX4_PATH_SLOWDOWN_DISTANCE_M:-2.5}
       -p goal_tolerance_m:=${PX4_PATH_GOAL_TOLERANCE_M:-0.3}
       -p corner_gain:=${PX4_PATH_CORNER_GAIN:-1.5}
-      -p max_yaw_rate_rps:=${PX4_PATH_MAX_YAW_RATE_RPS:-0.7}
+      -p max_yaw_rate_rps:=${PX4_PATH_MAX_YAW_RATE_RPS:-1.0}
       -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
       -p auto_arm:=${PX4_AUTO_ARM:-true}
