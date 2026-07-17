@@ -1,0 +1,75 @@
+# GBPlanner -> PX4 bypass for the Crete simulation.
+#
+# This file reuses the simulation/planner services from the NMPC stack, but
+# intentionally does not import the sdf_nmpc or CBF services.  The path
+# follower converts /gbplanner_path directly to smooth MAVROS velocity
+# setpoints.  All `extends.file` paths are relative to this file.
+
+services:
+  ros1_launch_roscore:
+    extends:
+      file: docker-compose.uav_nmpc_sim_crete.yml
+      service: ros1_launch_roscore
+
+  ros1_launch_bridge_params:
+    extends:
+      file: docker-compose.uav_nmpc_sim_crete.yml
+      service: ros1_launch_bridge_params
+    command: bash -c "roslaunch robot_bringup bridge_params.launch config_file:=uav_rmf_bypass"
+
+  ros2_launch_ros1_bridge:
+    extends:
+      file: docker-compose.uav_nmpc_sim_crete.yml
+      service: ros2_launch_ros1_bridge
+    depends_on:
+      ros1_launch_bridge_params:
+        condition: service_completed_successfully
+
+  ros1_launch_gbplanner:
+    extends:
+      file: docker-compose.uav_nmpc_sim_crete.yml
+      service: ros1_launch_gbplanner
+    command: >
+      roslaunch robot_bringup gbplanner_sim_custom.launch
+      robot_name:=rmf
+      config_name:=uav_nmpc_sim
+      pci_file:=/workspace/src/robot_bringup/config/ros1/gbplanner/planner_control_interface_bypass.yaml
+      rviz_en:=true
+      rviz_config:=/workspace/src/robot_bringup/rviz/ros1/custom_px4.rviz
+
+  ros2_launch_uav_sim:
+    extends:
+      file: docker-compose.uav_nmpc_sim_crete.yml
+      service: ros2_launch_uav_sim
+
+  ros2_launch_px4_sitl:
+    extends:
+      file: docker-compose.uav_nmpc_sim_crete.yml
+      service: ros2_launch_px4_sitl
+
+  ros2_launch_mavros:
+    extends:
+      file: docker-compose.uav_nmpc_sim_crete.yml
+      service: ros2_launch_mavros
+
+  # Replaces px4_mavros_bridge + sdf_nmpc + CBF.  It also relays MAVROS
+  # odometry to /rmf/odom, which GBPlanner consumes through ros1_bridge.
+  ros2_launch_px4_gbplanner_path_follower:
+    extends:
+      file: docker-compose.uav_nmpc_sim_crete.yml
+      service: ros2_launch_px4_mavros_bridge
+    command: >
+      python3 /workspace/src/robot_bringup/scripts/ros2/px4_gbplanner_path_follower.py
+      --ros-args
+      -p use_sim_time:=true
+      -p lookahead_distance_m:=${PX4_PATH_LOOKAHEAD_M:-1.5}
+      -p max_speed_mps:=${PX4_PATH_MAX_SPEED_MPS:-1.5}
+      -p min_turn_speed_mps:=${PX4_PATH_MIN_TURN_SPEED_MPS:-0.45}
+      -p max_acceleration_mps2:=${PX4_PATH_MAX_ACCEL_MPS2:-0.8}
+      -p max_deceleration_mps2:=${PX4_PATH_MAX_DECEL_MPS2:-1.2}
+      -p slowdown_distance_m:=${PX4_PATH_SLOWDOWN_DISTANCE_M:-2.5}
+      -p goal_tolerance_m:=${PX4_PATH_GOAL_TOLERANCE_M:-0.3}
+      -p corner_gain:=${PX4_PATH_CORNER_GAIN:-1.5}
+      -p max_yaw_rate_rps:=${PX4_PATH_MAX_YAW_RATE_RPS:-0.7}
+      -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
+      -p auto_arm:=${PX4_AUTO_ARM:-true}
