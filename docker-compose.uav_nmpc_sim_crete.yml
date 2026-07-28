@@ -108,7 +108,7 @@ services:
   ros1_launch_gbplanner:
     <<: [*ros1-launch-template]
     image: unified_autonomy:ros1_gbplanner
-    command: roslaunch robot_bringup gbplanner_sim_custom.launch robot_name:=rmf config_name:=uav_nmpc_sim rviz_en:=true rviz_config:=/workspace/src/robot_bringup/rviz/ros1/custom_px4.rviz
+    command: roslaunch robot_bringup gbplanner_sim_custom_demo.launch robot_name:=rmf config_name:=uav_nmpc_sim rviz_en:=true rviz_config:=/workspace/src/robot_bringup/rviz/ros1/custom_px4.rviz
     volumes:
       - *x11-volume
       - ./workspaces/ws_gbplanner:/workspace
