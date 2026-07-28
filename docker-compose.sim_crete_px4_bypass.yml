@@ -8,18 +8,18 @@
 services:
   ros1_launch_roscore:
     extends:
-      file: docker-compose.uav_nmpc_sim_crete.yml
+      file: docker-compose.sim_crete_px4.yml
       service: ros1_launch_roscore
 
   ros1_launch_bridge_params:
     extends:
-      file: docker-compose.uav_nmpc_sim_crete.yml
+      file: docker-compose.sim_crete_px4.yml
       service: ros1_launch_bridge_params
     command: bash -c "roslaunch robot_bringup bridge_params.launch config_file:=uav_rmf_bypass"
 
   ros2_launch_ros1_bridge:
     extends:
-      file: docker-compose.uav_nmpc_sim_crete.yml
+      file: docker-compose.sim_crete_px4.yml
       service: ros2_launch_ros1_bridge
     depends_on:
       ros1_launch_bridge_params:
@@ -27,36 +27,35 @@ services:
 
   ros1_launch_gbplanner:
     extends:
-      file: docker-compose.uav_nmpc_sim_crete.yml
+      file: docker-compose.sim_crete_px4.yml
       service: ros1_launch_gbplanner
     command: >
-      roslaunch robot_bringup gbplanner_sim_custom.launch
+      roslaunch robot_bringup gbplanner_sim_px4.launch
       robot_name:=rmf
-      config_name:=uav_nmpc_sim
-      pci_file:=/workspace/src/robot_bringup/config/ros1/gbplanner/planner_control_interface_bypass.yaml
+      config_name:=custom
       rviz_en:=true
       rviz_config:=/workspace/src/robot_bringup/rviz/ros1/custom_px4.rviz
 
   ros2_launch_uav_sim:
     extends:
-      file: docker-compose.uav_nmpc_sim_crete.yml
+      file: docker-compose.sim_crete_px4.yml
       service: ros2_launch_uav_sim
 
   ros2_launch_px4_sitl:
     extends:
-      file: docker-compose.uav_nmpc_sim_crete.yml
+      file: docker-compose.sim_crete_px4.yml
       service: ros2_launch_px4_sitl
 
   ros2_launch_mavros:
     extends:
-      file: docker-compose.uav_nmpc_sim_crete.yml
+      file: docker-compose.sim_crete_px4.yml
       service: ros2_launch_mavros
 
   # Replaces px4_mavros_bridge + sdf_nmpc + CBF.  It also relays MAVROS
   # odometry to /rmf/odom, which GBPlanner consumes through ros1_bridge.
   ros2_launch_px4_gbplanner_path_follower:
     extends:
-      file: docker-compose.uav_nmpc_sim_crete.yml
+      file: docker-compose.sim_crete_px4.yml
       service: ros2_launch_px4_mavros_bridge
     command: >
       python3 /workspace/src/robot_bringup/scripts/ros2/px4_gbplanner_path_follower.py
