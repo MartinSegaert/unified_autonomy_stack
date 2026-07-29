@@ -89,6 +89,8 @@ services:
     depends_on:
       ros1_launch_roscore:
         condition: service_healthy
+      ros1_launch_bridge_params:
+        condition: service_completed_successfully
 
   # ==================== CODE ====================
   # * Each workspace is built and launched in its own service
