@@ -133,7 +133,14 @@ services:
     image: unified_autonomy:ros2_sim
     runtime: nvidia
     # Start only the Crete world. PX4 SITL spawns and controls the x500.
-    command: ros2 launch robot_bringup uav_sim_crete_px4.launch.xml headless:=${GZ_HEADLESS:-false} robot_name:=x500_3d_lidar_3
+    command: >-
+      ros2 launch robot_bringup uav_sim_crete_px4.launch.xml
+      headless:=${GZ_HEADLESS:-false}
+      robot_name:=x500_3d_lidar_3
+      lidar_horizontal_min_angle:=-0.7
+      lidar_horizontal_max_angle:=0.7
+      lidar_vertical_min_angle:=-0.3
+      lidar_vertical_max_angle:=0.7
     privileged: true
     volumes:
       - *x11-volume
