@@ -57,22 +57,22 @@ launch: ## Launch all services
 #TODO: launch for specific services
 
 stop: ## Stop all launched services
-	@docker compose --profile launch down
+	@docker compose -f $(DOCKER_COMPOSE_FILE) --profile launch down
 
 restart: ## Restart all launched services
-	@docker compose --profile launch restart
+	@docker compose -f $(DOCKER_COMPOSE_FILE) --profile launch restart
 
 # ==================== MONITORING & DEBUG ====================
 .PHONY: status status-all logs
 
 status:
-	@docker compose --profile launch ps
+	@docker compose -f $(DOCKER_COMPOSE_FILE) --profile launch ps
 
 status-all: ## All Services Status (all profiles)
-	@docker compose --profile images --profile build --profile runtime ps
+	@docker compose -f $(DOCKER_COMPOSE_FILE) --profile images --profile build --profile runtime ps
 
 logs: ## show logs from all services
-	@docker compose --profile launch logs -f
+	@docker compose -f $(DOCKER_COMPOSE_FILE) --profile launch logs -f
 
 # TODO: Pattern rule for opening shell in specific services
 
@@ -80,7 +80,7 @@ logs: ## show logs from all services
 .PHONY: clean clean-all
 
 clean:
-	@docker compose --profile launch --profile build down
+	@docker compose -f $(DOCKER_COMPOSE_FILE) --profile launch --profile build down
 
 clean-all:
-	@docker compose --profile launch --profile build down -v
+	@docker compose -f $(DOCKER_COMPOSE_FILE) --profile launch --profile build down -v
