@@ -290,7 +290,7 @@ services:
       - ACADOS_SOURCE_DIR=/home/developer/acados
       - LD_LIBRARY_PATH=/usr/local/lib:/home/developer/acados/lib:${LD_LIBRARY_PATH}
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 launch robot_bringup nmpc_custom_px4.launch.py output_topic:=/sdf_nmpc/cmd/acc"
+    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-x500_2/nmpc_config.yaml} output_topic:=/sdf_nmpc/cmd/acc"
     volumes:
       - ./workspaces/ws_nmpc:/workspace
       - *robot-bringup-volume
@@ -311,7 +311,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
       - QT_X11_NO_MITSHM=1
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "ros2 launch robot_bringup cbf_pc_selector_sim.launch.py"
+    command: bash -c "ros2 launch robot_bringup cbf_pc_selector_sim.launch.py cfg:=${CBF_PC_SELECTOR_CFG:-x500_2/cbf_pc_selector.yaml}"
     volumes:
       - ./workspaces/ws_cbf:/workspace
       - *robot-bringup-volume
@@ -330,7 +330,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
       - QT_X11_NO_MITSHM=1
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "ros2 launch robot_bringup cbf_sim.launch.py"
+    command: bash -c "ros2 launch robot_bringup cbf_sim.launch.py cfg:=${CBF_CFG:-cbf_sim.yaml}"
     volumes:
       - ./workspaces/ws_cbf:/workspace
       - *robot-bringup-volume
