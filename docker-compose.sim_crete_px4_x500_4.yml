@@ -139,7 +139,7 @@ services:
       robot_name:=x500_3d_lidar_4
       lidar_horizontal_min_angle:=0.0
       lidar_horizontal_max_angle:=6.28
-      lidar_vertical_min_angle:=-0.3
+      lidar_vertical_min_angle:=0.0
       lidar_vertical_max_angle:=1.5
     privileged: true
     volumes:
@@ -275,7 +275,7 @@ services:
       -p publish_lidar_tf:=${PX4_PUBLISH_LIDAR_TF:-true}
       -p lidar_parent_frame_id:=${PX4_LIDAR_PARENT_FRAME:-base_link}
       -p lidar_child_frame_id:=${PX4_LIDAR_CHILD_FRAME:-lidar_link}
-      -p lidar_z_offset_m:=${PX4_LIDAR_Z_OFFSET_M:-0.1}
+      -p lidar_model_sdf_path:=${PX4_LIDAR_MODEL_SDF_PATH:-/workspace/src/robot_bringup/gz/models/x500_3d_lidar_4/model.sdf}
       -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
       -p auto_arm:=${PX4_AUTO_ARM:-true}
     volumes:
