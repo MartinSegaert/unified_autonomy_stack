@@ -7,3 +7,6 @@
 [submodule "workspaces/PX4"]
 	path = workspaces/PX4
 	url = git@github.com:PX4/PX4-Autopilot.git
+[submodule "workspaces/ws_cbf/src/composite_cbf"]
+	path = workspaces/ws_cbf/src/composite_cbf
+	url = git@github.com:ntnu-arl/composite_cbf.git
