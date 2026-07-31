@@ -345,10 +345,15 @@ services:
     command: >-
       bash -c "source /opt/ros/humble/setup.bash &&
       source install/setup.bash &&
+      ros2 run sdf_nmpc_ros build_solver.py --ros-args
+      -p cfg:=${NMPC_CFG:-/workspace/src/robot_bringup/config/ros2/x500_4/nmpc_goal_velocity.yaml} &&
       ros2 launch /workspace/src/robot_bringup/launch/ros2/nmpc_goal_velocity.launch.py
       cfg_file:=${NMPC_CFG:-/workspace/src/robot_bringup/config/ros2/x500_4/nmpc_goal_velocity.yaml}
       output_topic:=/sdf_nmpc/cmd/acc
-      joystick_topic:=/sdf_nmpc/joystick"
+      joystick_topic:=/sdf_nmpc/joystick
+      enable_sdf_nodes:=false
+      viz_sdf_2d:=false
+      viz_sdf_3d:=false"
     volumes:
       - ./workspaces/ws_nmpc:/workspace
       - *robot-bringup-volume
