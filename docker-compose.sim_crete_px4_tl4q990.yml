@@ -22,6 +22,13 @@ x-x11-volume: &x11-volume
 x-robot-bringup-volume: &robot-bringup-volume
   ./workspaces/robot_bringup:/workspace/src/robot_bringup:rw
 
+# ROS 2 package discovery resolves robot_bringup to the workspace's installed
+# share directory.  Mount the live configs there as well, otherwise configs
+# added after the image was built (such as tl4q990/) are invisible to nodes
+# using get_package_share_directory().
+x-robot-bringup-installed-config-volume: &robot-bringup-installed-config-volume
+  ./workspaces/robot_bringup/config:/workspace/install/robot_bringup/share/robot_bringup/config:ro
+
 x-recorded-data-volume: &recorded-data-volume
   ./data:/data:rw
 
@@ -235,12 +242,14 @@ services:
     command: >
       bash -c "source /opt/ros/humble/setup.bash &&
       ros2 run mavros mavros_node --ros-args
-      --params-file /opt/ros/humble/share/mavros/launch/px4_pluginlists.yaml
+      --params-file /workspace/src/robot_bringup/config/ros2/tl4q990/mavros_pluginlists.yaml
       --params-file /opt/ros/humble/share/mavros/launch/px4_config.yaml
       -p fcu_url:=udp://0.0.0.0:14540@127.0.0.1:14580
       -p tgt_system:=1
       -p tgt_component:=1
       -r __ns:=/mavros"
+    volumes:
+      - *robot-bringup-volume
     environment:
       - ROS_DOMAIN_ID=${DOMAIN_ID}
     healthcheck:
@@ -266,6 +275,8 @@ services:
       python3 /workspace/src/robot_bringup/scripts/ros2/px4_mavros_bridge.py
       --ros-args
       -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/rmf/cmd/acc}
+      -p controller_ready_topic:=${PX4_CONTROLLER_READY_TOPIC:-/sdf_nmpc/cmd/acc}
+      -p controller_hold_service:=${PX4_CONTROLLER_HOLD_SERVICE:-/sdf_nmpc/hover}
       -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
       -p body_frame_id:=${PX4_BODY_FRAME:-base_link}
       -p use_sim_time:=true
@@ -282,6 +293,8 @@ services:
       -p auto_takeoff:=${PX4_AUTO_TAKEOFF:-true}
       -p takeoff_handover_altitude:=${PX4_TAKEOFF_ALTITUDE:-2.0}
       -p takeoff_altitude_tolerance:=${PX4_TAKEOFF_TOLERANCE:-0.2}
+      -p takeoff_hold_mode:=${PX4_TAKEOFF_HOLD_MODE:-AUTO.LOITER}
+      -p mode_request_period_s:=${PX4_MODE_REQUEST_PERIOD:-0.5}
     volumes:
       - *robot-bringup-volume
     environment:
@@ -307,6 +320,7 @@ services:
     volumes:
       - ./workspaces/ws_nmpc:/workspace
       - *robot-bringup-volume
+      - *robot-bringup-installed-config-volume
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev/dri:/dev/dri
     devices:
@@ -328,6 +342,7 @@ services:
     volumes:
       - ./workspaces/ws_cbf:/workspace
       - *robot-bringup-volume
+      - *robot-bringup-installed-config-volume
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev/dri:/dev/dri
     devices:
@@ -347,6 +362,7 @@ services:
     volumes:
       - ./workspaces/ws_cbf:/workspace
       - *robot-bringup-volume
+      - *robot-bringup-installed-config-volume
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev/dri:/dev/dri
     devices:

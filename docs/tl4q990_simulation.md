@@ -20,6 +20,19 @@ For a machine without a display, prefix the command with
 `GZ_HEADLESS=true`. The first run recompiles PX4 SITL because the vehicle has a
 dedicated airframe entry and can therefore take longer than later runs.
 
+The startup bridge takes off automatically, switches to `AUTO.LOITER` near
+the configured handover altitude, and waits there if NMPC has not started yet.
+The bridge checks `/sdf_nmpc/cmd/acc` directly, so the CBF's zero-command
+fallback cannot be mistaken for a ready controller. It then calls
+`/sdf_nmpc/hover` to latch the current airborne pose before requesting
+`OFFBOARD`. If the upstream command later times out, it returns to
+`AUTO.LOITER` instead of continuing on a stale command.
+
+The TL4Q990 NMPC preset also uses conservative vertical acceleration and
+velocity limits for the heavier, slower airframe. These limits avoid the
+alternating saturated vertical commands that are stable on an x500-class
+vehicle but cause large altitude oscillations here.
+
 To stop and remove the containers:
 
 ```bash
@@ -27,6 +40,11 @@ docker compose \
   -f docker-compose.sim_crete_px4_tl4q990.yml \
   --profile launch down
 ```
+
+Gazebo may print warnings saying that `gz_frame_id` is not defined by SDF and
+is being copied into a sensor element. `gz_frame_id` is a Gazebo sensor
+extension used by the existing models; these parser warnings do not affect
+vehicle forces, PX4 altitude control, or the OFFBOARD handover.
 
 ## Initial physical assumptions
 
