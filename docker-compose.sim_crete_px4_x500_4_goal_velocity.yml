@@ -172,7 +172,7 @@ services:
     runtime: nvidia
     # Start only the Crete world. PX4 SITL spawns and controls the x500.
     command: >-
-      ros2 launch robot_bringup uav_sim_crete_px4.launch.xml
+      ros2 launch robot_bringup uav_sim_crete_px4.launch.xml world:=my_world
       headless:=${GZ_HEADLESS:-false}
       robot_name:=x500_3d_lidar_4
       lidar_horizontal_min_angle:=0.0
