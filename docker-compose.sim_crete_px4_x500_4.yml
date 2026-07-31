@@ -299,7 +299,7 @@ services:
       - ACADOS_SOURCE_DIR=/home/developer/acados
       - LD_LIBRARY_PATH=/usr/local/lib:/home/developer/acados/lib:${LD_LIBRARY_PATH}
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-x500_4/nmpc_config.yaml} output_topic:=/sdf_nmpc/cmd/acc"
+    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 run sdf_nmpc_ros build_solver.py --ros-args -p cfg:=ros2/${NMPC_CFG:-x500_4/nmpc_config.yaml} && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-x500_4/nmpc_config.yaml} enable_sdf_nodes:=false output_topic:=/sdf_nmpc/cmd/acc"
     volumes:
       - ./workspaces/ws_nmpc:/workspace
       - *robot-bringup-volume

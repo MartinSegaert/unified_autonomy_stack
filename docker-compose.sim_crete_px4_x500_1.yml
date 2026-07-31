@@ -141,6 +141,7 @@ services:
       lidar_horizontal_max_angle:=6.28
       lidar_vertical_min_angle:=-0.3
       lidar_vertical_max_angle:=1.5
+    # TODO : Make min/max angles read from model.sdf
     privileged: true
     volumes:
       - *x11-volume
@@ -299,7 +300,7 @@ services:
       - ACADOS_SOURCE_DIR=/home/developer/acados
       - LD_LIBRARY_PATH=/usr/local/lib:/home/developer/acados/lib:${LD_LIBRARY_PATH}
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-x500_1/nmpc_config.yaml} output_topic:=/sdf_nmpc/cmd/acc"
+    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 run sdf_nmpc_ros build_solver.py --ros-args -p cfg:=ros2/${NMPC_CFG:-x500_1/nmpc_config.yaml} && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-x500_1/nmpc_config.yaml} enable_sdf_nodes:=false output_topic:=/sdf_nmpc/cmd/acc"
     volumes:
       - ./workspaces/ws_nmpc:/workspace
       - *robot-bringup-volume
