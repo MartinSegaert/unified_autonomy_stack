@@ -278,6 +278,9 @@ services:
       -p lidar_model_sdf_path:=${PX4_LIDAR_MODEL_SDF_PATH:-/workspace/src/robot_bringup/gz/models/x500_3d_lidar_4/model.sdf}
       -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
       -p auto_arm:=${PX4_AUTO_ARM:-true}
+      -p auto_takeoff:=${PX4_AUTO_TAKEOFF:-true}
+      -p takeoff_handover_altitude:=${PX4_TAKEOFF_ALTITUDE:-2.0}
+      -p takeoff_altitude_tolerance:=${PX4_TAKEOFF_TOLERANCE:-0.2}
     volumes:
       - *robot-bringup-volume
     environment:
