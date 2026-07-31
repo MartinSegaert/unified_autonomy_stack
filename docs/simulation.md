@@ -4,6 +4,9 @@ The Simulation environment utilizes **Gazebo** and **Aerial Gym Simulator**. Gaz
 
 ## Gazebo
 
+For the PX4 SITL model approximating a 990 mm Tarot TL4Q990-class quadrotor,
+see [TL4Q990-class PX4 simulation](./tl4q990_simulation.md).
+
 We provide ROS 2 simulators for multi-rotor and differntial drive wheeled robot integrated with the Unified Autonomy Stack. Both simulators are located in the `unified_autonomy_stack/workspaces/ws_sim` workspace.
 
 ### Multirotor Simulator
