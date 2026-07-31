@@ -275,7 +275,7 @@ services:
       python3 /workspace/src/robot_bringup/scripts/ros2/px4_mavros_bridge.py
       --ros-args
       -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/rmf/cmd/acc}
-      -p controller_ready_topic:=${PX4_CONTROLLER_READY_TOPIC:-/sdf_nmpc/cmd/acc}
+      -p controller_ready_topic:=${PX4_CONTROLLER_READY_TOPIC:-/rmf/cmd/acc}
       -p controller_hold_service:=${PX4_CONTROLLER_HOLD_SERVICE:-/sdf_nmpc/hover}
       -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
       -p body_frame_id:=${PX4_BODY_FRAME:-base_link}
@@ -316,7 +316,7 @@ services:
       - ACADOS_SOURCE_DIR=/home/developer/acados
       - LD_LIBRARY_PATH=/usr/local/lib:/home/developer/acados/lib:${LD_LIBRARY_PATH}
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 run sdf_nmpc_ros build_solver.py --ros-args -p cfg:=ros2/${NMPC_CFG:-tl4q990/nmpc_config.yaml} && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-tl4q990/nmpc_config.yaml} enable_sdf_nodes:=false output_topic:=/rmf/cmd/acc"
+    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 run sdf_nmpc_ros build_solver.py --ros-args -p cfg:=ros2/${NMPC_CFG:-tl4q990/nmpc_config.yaml} && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-tl4q990/nmpc_config.yaml} enable_sdf_nodes:=false output_topic:=/sdf_nmpc/cmd/acc"
     volumes:
       - ./workspaces/ws_nmpc:/workspace
       - *robot-bringup-volume
@@ -327,43 +327,43 @@ services:
       - /dev/dri:/dev/dri
 
 
-  # # ==================== CBF ====================
-  # ros2_launch_cbf_pc_select:
-  #   <<: *ros2-launch-template
-  #   image: unified_autonomy:ros2_cbf
-  #   runtime: nvidia
-  #   environment:
-  #     - DISPLAY=${DISPLAY}
-  #     - NVIDIA_VISIBLE_DEVICES=all
-  #     - NVIDIA_DRIVER_CAPABILITIES=all
-  #     - QT_X11_NO_MITSHM=1
-  #     - ROS_DOMAIN_ID=${DOMAIN_ID}
-  #   command: bash -c "ros2 launch robot_bringup cbf_pc_selector_sim.launch.py cfg:=${CBF_PC_SELECTOR_CFG:-tl4q990/cbf_pc_selector.yaml}"
-  #   volumes:
-  #     - ./workspaces/ws_cbf:/workspace
-  #     - *robot-bringup-volume
-  #     - *robot-bringup-installed-config-volume
-  #     - /tmp/.X11-unix:/tmp/.X11-unix:rw
-  #     - /dev/dri:/dev/dri
-  #   devices:
-  #     - /dev/dri:/dev/dri
+  # ==================== CBF ====================
+  ros2_launch_cbf_pc_select:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_cbf
+    runtime: nvidia
+    environment:
+      - DISPLAY=${DISPLAY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - QT_X11_NO_MITSHM=1
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+    command: bash -c "ros2 launch robot_bringup cbf_pc_selector_sim.launch.py cfg:=${CBF_PC_SELECTOR_CFG:-tl4q990/cbf_pc_selector.yaml}"
+    volumes:
+      - ./workspaces/ws_cbf:/workspace
+      - *robot-bringup-volume
+      - *robot-bringup-installed-config-volume
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev/dri:/dev/dri
+    devices:
+      - /dev/dri:/dev/dri
 
-  # ros2_launch_composite_cbf:
-  #   <<: *ros2-launch-template
-  #   image: unified_autonomy:ros2_cbf
-  #   runtime: nvidia
-  #   environment:
-  #     - DISPLAY=${DISPLAY}
-  #     - NVIDIA_VISIBLE_DEVICES=all
-  #     - NVIDIA_DRIVER_CAPABILITIES=all
-  #     - QT_X11_NO_MITSHM=1
-  #     - ROS_DOMAIN_ID=${DOMAIN_ID}
-  #   command: bash -c "ros2 launch robot_bringup cbf_sim.launch.py cfg:=${CBF_CFG:-custom/cbf.yaml}"
-  #   volumes:
-  #     - ./workspaces/ws_cbf:/workspace
-  #     - *robot-bringup-volume
-  #     - *robot-bringup-installed-config-volume
-  #     - /tmp/.X11-unix:/tmp/.X11-unix:rw
-  #     - /dev/dri:/dev/dri
-  #   devices:
-  #     - /dev/dri:/dev/dri
+  ros2_launch_composite_cbf:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_cbf
+    runtime: nvidia
+    environment:
+      - DISPLAY=${DISPLAY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - QT_X11_NO_MITSHM=1
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+    command: bash -c "ros2 launch robot_bringup cbf_sim.launch.py cfg:=${CBF_CFG:-custom/cbf.yaml}"
+    volumes:
+      - ./workspaces/ws_cbf:/workspace
+      - *robot-bringup-volume
+      - *robot-bringup-installed-config-volume
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev/dri:/dev/dri
+    devices:
+      - /dev/dri:/dev/dri
