@@ -103,21 +103,59 @@ services:
   # *   ros2_launch service: ros2_launch_<workspace_name>
   # *   workspace folder: ws_<workspace_name>
 
-  # ==================== PLANNING ====================
+  # ==================== GOAL VELOCITY REFERENCE ====================
 
-  # Planner
-  # --- GBPlanner ---
-  ros1_launch_gbplanner:
-    <<: [*ros1-launch-template]
-    image: unified_autonomy:ros1_gbplanner
-    command: roslaunch robot_bringup gbplanner_sim_px4.launch robot_name:=rmf config_name:=x500_3 rviz_en:=true rviz_config:=/workspace/src/robot_bringup/rviz/ros1/custom_px4.rviz
+  # Convert an RViz goal into a body-frame velocity reference pointing
+  # straight at the goal. NMPC remains responsible for obstacle avoidance.
+  ros2_launch_goal_velocity:
+    <<: [*ros2-launch-template]
+    image: unified_autonomy:ros2_nmpc
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+    command: >
+      bash -c "source /opt/ros/humble/setup.bash &&
+      python3 /workspace/src/robot_bringup/scripts/ros2/goal_velocity_commander.py
+      --ros-args
+      -p use_sim_time:=true
+      -p goal_topic:=/goal
+      -p secondary_goal_topic:=/goal_pose
+      -p odometry_topic:=/rmf/odom
+      -p cmd_topic:=/sdf_nmpc/joystick
+      -p publish_horizon_ref:=false
+      -p speed:=${GOAL_SPEED:-1.0}
+      -p target_altitude:=${GOAL_ALTITUDE:-2.0}
+      -p goal_tolerance:=${GOAL_TOLERANCE:-0.4}"
+    volumes:
+      - *robot-bringup-volume
+
+  # Keep the interactive goal-setting and NMPC/CBF visualization available
+  # without starting GBPlanner.
+  ros2_launch_goal_rviz:
+    <<: [*ros2-launch-template]
+    image: unified_autonomy:ros2_sim
+    runtime: nvidia
+    depends_on:
+      ros2_launch_px4_mavros_bridge:
+        condition: service_started
+    command: >
+      bash -c "source /opt/ros/humble/setup.bash &&
+      source install/setup.bash &&
+      rviz2 -d /workspace/src/robot_bringup/rviz/ros1/custom_goal_velocity.rviz"
     volumes:
       - *x11-volume
-      - ./workspaces/ws_gbplanner:/workspace
+      - ./workspaces/ws_sim:/workspace
       - *robot-bringup-volume
     devices:
       - /dev/dri:/dev/dri
-    deploy:  # Add this section
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+      - DISPLAY=${DISPLAY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - __NV_PRIME_RENDER_OFFLOAD=${__NV_PRIME_RENDER_OFFLOAD:-1}
+      - __GLX_VENDOR_LIBRARY_NAME=${__GLX_VENDOR_LIBRARY_NAME:-nvidia}
+      - LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-0}
+    deploy:
       resources:
         reservations:
           devices:
@@ -134,13 +172,13 @@ services:
     runtime: nvidia
     # Start only the Crete world. PX4 SITL spawns and controls the x500.
     command: >-
-      ros2 launch robot_bringup uav_sim_crete_px4.launch.xml
+      ros2 launch robot_bringup uav_sim_crete_px4.launch.xml world:=my_world
       headless:=${GZ_HEADLESS:-false}
-      robot_name:=x500_3d_lidar_3
-      lidar_horizontal_min_angle:=-0.7
-      lidar_horizontal_max_angle:=0.7
-      lidar_vertical_min_angle:=-0.3
-      lidar_vertical_max_angle:=0.7
+      robot_name:=x500_3d_lidar_4
+      lidar_horizontal_min_angle:=0.0
+      lidar_horizontal_max_angle:=6.28
+      lidar_vertical_min_angle:=0.0
+      lidar_vertical_max_angle:=1.5
     privileged: true
     volumes:
       - *x11-volume
@@ -149,7 +187,7 @@ services:
       # PX4 sends Gazebo an SDF include containing this absolute path. Mount it
       # at the same location in both the Gazebo and PX4 containers.
       - ./workspaces/PX4:/repo/workspaces/PX4:ro
-      - ./workspaces/robot_bringup/gz/models/x500_3d_lidar_3:/repo/workspaces/PX4/Tools/simulation/gz/models/x500_3d_lidar_3:ro
+      - ./workspaces/robot_bringup/gz/models/x500_3d_lidar_4:/repo/workspaces/PX4/Tools/simulation/gz/models/x500_3d_lidar_4:ro
     devices:
       - /dev/dri:/dev/dri
     environment:
@@ -187,7 +225,7 @@ services:
   ros2_launch_px4_sitl:
     <<: *ros2-launch-template
     image: unified_autonomy:ros2_px4_sim
-    command: bash -c "cd /repo/workspaces/PX4 && make px4_sitl gz_x500_3d_lidar_3"
+    command: bash -c "cd /repo/workspaces/PX4 && make px4_sitl gz_x500_3d_lidar_4"
     depends_on:
       ros2_launch_uav_sim:
         # PX4_GZ_STANDALONE invokes PX4's own scene/info readiness loop. Start
@@ -201,7 +239,7 @@ services:
       # a ../../../../workspaces/PX4 worktree. Mounting both below /repo keeps
       # those relative paths valid inside the container.
       - ./.git/modules/workspaces/PX4:/repo/.git/modules/workspaces/PX4:ro
-      - ./workspaces/robot_bringup/gz/models/x500_3d_lidar_3:/repo/workspaces/PX4/Tools/simulation/gz/models/x500_3d_lidar_3:ro
+      - ./workspaces/robot_bringup/gz/models/x500_3d_lidar_4:/repo/workspaces/PX4/Tools/simulation/gz/models/x500_3d_lidar_4:ro
     environment:
       - ROS_DOMAIN_ID=${DOMAIN_ID}
       - PX4_GZ_STANDALONE=1
@@ -215,8 +253,8 @@ services:
       - GZ_IP=127.0.0.1
     healthcheck:
       # PX4 appends its zero-based instance index to every spawned model name.
-      # Thus PX4_SIM_MODEL=gz_x500_3d_lidar_3 produces x500_3d_lidar_3_0.
-      test: ["CMD-SHELL", "topics=$$(gz topic -l) && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_3_0/link/base_link/sensor/imu_sensor/imu' && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_3_0/link/base_link/sensor/air_pressure_sensor/air_pressure' && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_3_0/link/base_link/sensor/magnetometer_sensor/magnetometer' && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_3_0/link/base_link/sensor/navsat_sensor/navsat'"]
+      # Thus PX4_SIM_MODEL=gz_x500_3d_lidar_4 produces x500_3d_lidar_4_0.
+      test: ["CMD-SHELL", "topics=$$(gz topic -l) && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_4_0/link/base_link/sensor/imu_sensor/imu' && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_4_0/link/base_link/sensor/air_pressure_sensor/air_pressure' && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_4_0/link/base_link/sensor/magnetometer_sensor/magnetometer' && echo \"$$topics\" | grep -q '/world/map/model/x500_3d_lidar_4_0/link/base_link/sensor/navsat_sensor/navsat'"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -261,6 +299,8 @@ services:
     depends_on:
       ros2_launch_mavros:
         condition: service_healthy
+    # RViz, NMPC, and goal_velocity_commander all use map as their world
+    # frame. Publishing map -> base_link keeps the full TF tree connected.
     command: >
       python3 /workspace/src/robot_bringup/scripts/ros2/px4_mavros_bridge.py
       --ros-args
@@ -270,14 +310,17 @@ services:
       -p use_sim_time:=true
       -p publish_tf:=${PX4_PUBLISH_TF:-true}
       -p stamp_tf_with_ros_time:=${PX4_STAMP_TF_WITH_ROS_TIME:-true}
-      -p tf_parent_frame_id:=${PX4_TF_PARENT_FRAME:-world}
+      -p tf_parent_frame_id:=${PX4_TF_PARENT_FRAME:-map}
       -p tf_child_frame_id:=${PX4_TF_CHILD_FRAME:-base_link}
       -p publish_lidar_tf:=${PX4_PUBLISH_LIDAR_TF:-true}
       -p lidar_parent_frame_id:=${PX4_LIDAR_PARENT_FRAME:-base_link}
       -p lidar_child_frame_id:=${PX4_LIDAR_CHILD_FRAME:-lidar_link}
-      -p lidar_model_sdf_path:=${PX4_LIDAR_MODEL_SDF_PATH:-/workspace/src/robot_bringup/gz/models/x500_3d_lidar_3/model.sdf}
+      -p lidar_model_sdf_path:=${PX4_LIDAR_MODEL_SDF_PATH:-/workspace/src/robot_bringup/gz/models/x500_3d_lidar_4/model.sdf}
       -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
       -p auto_arm:=${PX4_AUTO_ARM:-true}
+      -p auto_takeoff:=${PX4_AUTO_TAKEOFF:-true}
+      -p takeoff_handover_altitude:=${PX4_TAKEOFF_ALTITUDE:-2.0}
+      -p takeoff_altitude_tolerance:=${PX4_TAKEOFF_TOLERANCE:-0.2}
     volumes:
       - *robot-bringup-volume
     environment:
@@ -299,7 +342,18 @@ services:
       - ACADOS_SOURCE_DIR=/home/developer/acados
       - LD_LIBRARY_PATH=/usr/local/lib:/home/developer/acados/lib:${LD_LIBRARY_PATH}
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 run sdf_nmpc_ros build_solver.py --ros-args -p cfg:=ros2/${NMPC_CFG:-x500_3/nmpc_config.yaml} && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-x500_3/nmpc_config.yaml} enable_sdf_nodes:=false output_topic:=/sdf_nmpc/cmd/acc"
+    command: >-
+      bash -c "source /opt/ros/humble/setup.bash &&
+      source install/setup.bash &&
+      ros2 run sdf_nmpc_ros build_solver.py --ros-args
+      -p cfg:=${NMPC_CFG:-/workspace/src/robot_bringup/config/ros2/x500_4/nmpc_goal_velocity.yaml} &&
+      ros2 launch /workspace/src/robot_bringup/launch/ros2/nmpc_goal_velocity.launch.py
+      cfg_file:=${NMPC_CFG:-/workspace/src/robot_bringup/config/ros2/x500_4/nmpc_goal_velocity.yaml}
+      output_topic:=/sdf_nmpc/cmd/acc
+      joystick_topic:=/sdf_nmpc/joystick
+      enable_sdf_nodes:=false
+      viz_sdf_2d:=false
+      viz_sdf_3d:=false"
     volumes:
       - ./workspaces/ws_nmpc:/workspace
       - *robot-bringup-volume
@@ -309,7 +363,7 @@ services:
       - /dev/dri:/dev/dri
 
 
-  # ==================== CBF ====================
+  # # ==================== CBF ====================
   ros2_launch_cbf_pc_select:
     <<: *ros2-launch-template
     image: unified_autonomy:ros2_cbf
@@ -320,7 +374,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
       - QT_X11_NO_MITSHM=1
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "ros2 launch robot_bringup cbf_pc_selector_sim.launch.py cfg:=${CBF_PC_SELECTOR_CFG:-x500_3/cbf_pc_selector.yaml}"
+    command: bash -c "ros2 launch robot_bringup cbf_pc_selector_sim.launch.py cfg:=${CBF_PC_SELECTOR_CFG:-x500_4/cbf_pc_selector.yaml}"
     volumes:
       - ./workspaces/ws_cbf:/workspace
       - *robot-bringup-volume
