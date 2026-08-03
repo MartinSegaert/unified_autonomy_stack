@@ -326,6 +326,28 @@ services:
     devices:
       - /dev/dri:/dev/dri
 
+  # Publish NMPC's scalar speed as text attached to the UAV for the ROS 1 RViz
+  # instance launched with GBPlanner. The marker is included in bridge_uav_rmf.
+  ros2_launch_speed_marker:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_sim
+    depends_on:
+      ros2_launch_nmpc:
+        condition: service_started
+    command: >-
+      python3 /workspace/src/robot_bringup/scripts/ros2/speed_marker.py
+      --ros-args
+      -p use_sim_time:=true
+      -p speed_topic:=${UAV_SPEED_TOPIC:-/sdf_nmpc/output/speed}
+      -p marker_topic:=${UAV_SPEED_MARKER_TOPIC:-/uav/speed_marker}
+      -p frame_id:=${UAV_SPEED_MARKER_FRAME:-base_link}
+      -p height:=${UAV_SPEED_MARKER_HEIGHT:-2.0}
+      -p text_scale:=${UAV_SPEED_MARKER_SCALE:-0.5}
+    volumes:
+      - *robot-bringup-volume
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+
 
   # ==================== CBF ====================
   ros2_launch_cbf_pc_select:
