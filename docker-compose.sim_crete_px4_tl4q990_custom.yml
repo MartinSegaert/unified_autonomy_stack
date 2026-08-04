@@ -60,12 +60,8 @@ services:
     command: >-
       python3 /workspace/src/robot_bringup/scripts/ros2/straight_line_global_planner.py
       --ros-args
-      -p use_sim_time:=true
-      -p odometry_topic:=${GLOBAL_PLANNER_ODOMETRY_TOPIC:-/rmf/odom}
-      -p goal_topic:=${GLOBAL_PLANNER_GOAL_TOPIC:-/goal_pose}
-      -p path_topic:=${GLOBAL_PLANNER_PATH_TOPIC:-/gbplanner_path}
-      -p frame_id:=${GLOBAL_PLANNER_FRAME_ID:-map}
-      -p replan_interval:=${GLOBAL_PLANNER_REPLAN_INTERVAL:-2.0}
+      --params-file
+      /workspace/src/robot_bringup/config/ros2/custom/custom_global_planner.yaml
     volumes:
       - *robot-bringup-volume
     environment:
