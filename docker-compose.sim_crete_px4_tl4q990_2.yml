@@ -352,6 +352,26 @@ services:
     environment:
       - ROS_DOMAIN_ID=${DOMAIN_ID}
 
+  # Enable GBPlanner whenever the downsampled lidar cloud contains at least
+  # one finite return within the configured radius of the lidar origin.
+  ros2_launch_use_gbplanner_selector:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_sim
+    depends_on:
+      ros2_launch_uav_sim:
+        condition: service_healthy
+    command: >-
+      python3 /workspace/src/robot_bringup/scripts/ros2/use_gbplanner_selector.py
+      --ros-args
+      -p use_sim_time:=true
+      -p input_topic:=${GBPLANNER_SELECTOR_INPUT_TOPIC:-/rmf/lidar/points_downsampled}
+      -p output_topic:=${GBPLANNER_SELECTOR_OUTPUT_TOPIC:-/use_gbplanner}
+      -p distance_threshold:=${GBPLANNER_DISTANCE_THRESHOLD:-5.0}
+    volumes:
+      - *robot-bringup-volume
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+
 
   # ==================== CBF ====================
   ros2_launch_cbf_pc_select:
