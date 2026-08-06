@@ -363,10 +363,7 @@ services:
     command: >-
       python3 /workspace/src/robot_bringup/scripts/ros2/use_gbplanner_selector.py
       --ros-args
-      -p use_sim_time:=true
-      -p input_topic:=${GBPLANNER_SELECTOR_INPUT_TOPIC:-/rmf/lidar/points_downsampled}
-      -p output_topic:=${GBPLANNER_SELECTOR_OUTPUT_TOPIC:-/use_gbplanner}
-      -p distance_threshold:=${GBPLANNER_DISTANCE_THRESHOLD:-5.0}
+      --params-file /workspace/src/robot_bringup/config/ros2/custom/use_gbplanner_selector.yaml
     volumes:
       - *robot-bringup-volume
     environment:
