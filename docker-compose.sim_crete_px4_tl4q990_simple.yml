@@ -110,6 +110,14 @@ services:
   # *   ros2_launch service: ros2_launch_<workspace_name>
   # *   workspace folder: ws_<workspace_name>
 
+  ros1_launch_waypoint_follower:
+    <<: [*ros1-launch-template]
+    image: unified_autonomy:ros1_gbplanner
+    command: roslaunch robot_bringup waypoint_follower.launch autostart:=true
+    volumes:
+      - ./workspaces/ws_gbplanner:/workspace
+      - *robot-bringup-volume
+
   # ==================== SIMULATION ====================
 
   # --- Simulation ---

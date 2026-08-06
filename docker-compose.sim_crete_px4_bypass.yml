@@ -36,6 +36,12 @@ services:
       rviz_en:=true
       rviz_config:=/workspace/src/robot_bringup/rviz/ros1/custom_px4.rviz
 
+  ros1_launch_waypoint_follower:
+    extends:
+      file: docker-compose.sim_crete_px4.yml
+      service: ros1_launch_gbplanner
+    command: roslaunch robot_bringup waypoint_follower.launch autostart:=true
+
   ros2_launch_uav_sim:
     extends:
       file: docker-compose.sim_crete_px4.yml
