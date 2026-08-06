@@ -132,6 +132,14 @@ services:
               count: all
               capabilities: [gpu]
 
+  ros1_launch_waypoint_follower:
+    <<: [*ros1-launch-template]
+    image: unified_autonomy:ros1_gbplanner
+    command: roslaunch robot_bringup waypoint_follower.launch autostart:=true
+    volumes:
+      - ./workspaces/ws_gbplanner:/workspace
+      - *robot-bringup-volume
+
   # ==================== SIMULATION ====================
 
   # --- Simulation ---
@@ -347,6 +355,41 @@ services:
       -p frame_id:=${UAV_SPEED_MARKER_FRAME:-base_link}
       -p height:=${UAV_SPEED_MARKER_HEIGHT:-2.0}
       -p text_scale:=${UAV_SPEED_MARKER_SCALE:-0.5}
+    volumes:
+      - *robot-bringup-volume
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+
+  # Enable GBPlanner whenever the downsampled lidar cloud contains at least
+  # one finite return within the configured radius of the lidar origin.
+  ros2_launch_use_gbplanner_selector:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_sim
+    depends_on:
+      ros2_launch_uav_sim:
+        condition: service_healthy
+    command: >-
+      python3 /workspace/src/robot_bringup/scripts/ros2/use_gbplanner_selector.py
+      --ros-args
+      --params-file /workspace/src/robot_bringup/config/ros2/custom/use_gbplanner_selector.yaml
+    volumes:
+      - *robot-bringup-volume
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+
+  # Drive toward the latest waypoint with body-frame velocity commands when
+  # GBPlanner/NMPC acceleration control is not selected.
+  ros2_launch_waypoint_velocity_commander:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_sim
+    depends_on:
+      ros2_launch_uav_sim:
+        condition: service_healthy
+    command: >-
+      python3 /workspace/src/robot_bringup/scripts/ros2/waypoint_velocity_commander.py
+      --ros-args
+      --params-file /workspace/src/robot_bringup/config/ros2/custom/waypoint_velocity_commander.yaml
+      -p use_sim_time:=true
     volumes:
       - *robot-bringup-volume
     environment:
