@@ -369,6 +369,24 @@ services:
     environment:
       - ROS_DOMAIN_ID=${DOMAIN_ID}
 
+  # Drive toward the latest waypoint with body-frame velocity commands when
+  # GBPlanner/NMPC acceleration control is not selected.
+  ros2_launch_waypoint_velocity_commander:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_sim
+    depends_on:
+      ros2_launch_uav_sim:
+        condition: service_healthy
+    command: >-
+      python3 /workspace/src/robot_bringup/scripts/ros2/waypoint_velocity_commander.py
+      --ros-args
+      --params-file /workspace/src/robot_bringup/config/ros2/custom/waypoint_velocity_commander.yaml
+      -p use_sim_time:=true
+    volumes:
+      - *robot-bringup-volume
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+
 
   # ==================== CBF ====================
   ros2_launch_cbf_pc_select:
