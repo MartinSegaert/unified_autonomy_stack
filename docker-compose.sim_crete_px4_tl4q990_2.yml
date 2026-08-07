@@ -329,7 +329,10 @@ services:
       - ACADOS_SOURCE_DIR=/home/developer/acados
       - LD_LIBRARY_PATH=/usr/local/lib:/home/developer/acados/lib:${LD_LIBRARY_PATH}
       - ROS_DOMAIN_ID=${DOMAIN_ID}
-    command: bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 run sdf_nmpc_ros build_solver.py --ros-args -p cfg:=ros2/${NMPC_CFG:-tl4q990_2/nmpc_config.yaml} && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-tl4q990_2/nmpc_config.yaml} enable_sdf_nodes:=false output_topic:=/sdf_nmpc/cmd/acc"
+    # Keep the installed ROS executables synchronized with the mounted source.
+    # In particular, stale ref_gen_node.py versions ignore /rmf/ref_vel and
+    # silently retain the YAML's 2 m/s default.
+    command: bash -c "source /opt/ros/humble/setup.bash && colcon build --packages-select sdf_nmpc_ros --cmake-force-configure --cmake-args -DCMAKE_BUILD_TYPE=Release && source install/setup.bash && ros2 run sdf_nmpc_ros build_solver.py --ros-args -p cfg:=ros2/${NMPC_CFG:-tl4q990_2/nmpc_config.yaml} && ros2 launch robot_bringup nmpc_custom_px4.launch.py cfg:=${NMPC_CFG:-tl4q990_2/nmpc_config.yaml} enable_sdf_nodes:=false output_topic:=/sdf_nmpc/cmd/acc"
     volumes:
       - ./workspaces/ws_nmpc:/workspace
       - *robot-bringup-volume
