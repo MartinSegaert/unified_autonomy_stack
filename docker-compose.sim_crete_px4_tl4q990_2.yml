@@ -287,6 +287,7 @@ services:
       python3 /workspace/src/robot_bringup/scripts/ros2/px4_mavros_bridge.py
       --ros-args
       -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/rmf/cmd/acc}
+      -p select_velocity_when_gbplanner_disabled:=false
       -p controller_ready_topic:=${PX4_CONTROLLER_READY_TOPIC:-/rmf/cmd/acc}
       -p controller_hold_service:=${PX4_CONTROLLER_HOLD_SERVICE:-/sdf_nmpc/hover}
       -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
@@ -377,18 +378,18 @@ services:
     environment:
       - ROS_DOMAIN_ID=${DOMAIN_ID}
 
-  # Drive toward the latest waypoint with body-frame velocity commands when
-  # GBPlanner/NMPC acceleration control is not selected.
-  ros2_launch_waypoint_velocity_commander:
+  # Publish the obstacle- and waypoint-limited scalar speed that the NMPC
+  # reference generator can consume independently of command-source selection.
+  ros2_launch_reference_velocity_commander:
     <<: *ros2-launch-template
     image: unified_autonomy:ros2_sim
     depends_on:
       ros2_launch_uav_sim:
         condition: service_healthy
     command: >-
-      python3 /workspace/src/robot_bringup/scripts/ros2/waypoint_velocity_commander.py
+      python3 /workspace/src/robot_bringup/scripts/ros2/reference_velocity_commander.py
       --ros-args
-      --params-file /workspace/src/robot_bringup/config/ros2/custom/waypoint_velocity_commander.yaml
+      --params-file /workspace/src/robot_bringup/config/ros2/custom/reference_velocity_commander.yaml
       -p use_sim_time:=true
     volumes:
       - *robot-bringup-volume

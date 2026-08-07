@@ -10,3 +10,6 @@
 [submodule "workspaces/ws_cbf/src/composite_cbf"]
 	path = workspaces/ws_cbf/src/composite_cbf
 	url = git@github.com:ntnu-arl/composite_cbf.git
+[submodule "workspaces/ws_nmpc/src/sdf_nmpc_ros"]
+	path = workspaces/ws_nmpc/src/sdf_nmpc_ros
+	url = git@github.com:ntnu-arl/sdf_nmpc_ros.git
