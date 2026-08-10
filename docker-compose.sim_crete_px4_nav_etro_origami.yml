@@ -262,7 +262,28 @@ services:
     command: >-
       ros2 launch nav_etro_origami geofence_uploader.launch.py
       geojson_path:=${ETRO_GEOFENCE_GEOJSON:-/workspace/src/nav_etro_origami/config/input_trajectory/exampleTrajectory.geojson}
-      inflation_distance_m:=${ETRO_GEOFENCE_INFLATION_M:-50.0}
+      inflation_distance_m:=${ETRO_GEOFENCE_INFLATION_M:-0.0}
+    volumes:
+      - ./workspaces/ws_etro:/workspace
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+      - HOME=/tmp
+
+  ros2_launch_nav_etro_origami_waypoint:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_nav_etro_origami
+    # MAVROS runs as developer (UID/GID 1000). Fast DDS shared-memory endpoints
+    # are user-protected, so the client must use the same IDs when ipc: host is
+    # enabled. /tmp gives the non-root process a writable ROS log directory.
+    user: "1000:1000"
+    depends_on:
+      ros2_launch_mavros:
+        condition: service_healthy
+    command: >-
+      ros2 launch nav_etro_origami waypoint_uploader.launch.py
+      waypoint_file:=${WAYPOINTFILE:-/workspace/src/nav_etro_origami/config/waypoints.json}
+      launch_latitude:=${WAYPOINT_LAUNCH_LATITUDE:-35.571199}
+      launch_longitude:=${WAYPOINT_LAUNCH_LONGITUDE:-24.175212}
     volumes:
       - ./workspaces/ws_etro:/workspace
     environment:
