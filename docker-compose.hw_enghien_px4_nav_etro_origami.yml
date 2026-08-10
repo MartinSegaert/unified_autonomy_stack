@@ -1,0 +1,160 @@
+# Hardware deployment for the Enghien PX4/ETRO Origami field setup.
+#
+# Unlike docker-compose.sim_enghien_px4_nav_etro_origami.yml, this file does
+# not start Gazebo or PX4 SITL. MAVROS talks to the real flight controller on
+# the companion computer's serial port instead.
+#
+# Defaults match the existing robot_bringup PX4 hardware launch:
+#   PX4_SERIAL_DEVICE=/dev/ttyTHS2
+#   MAVROS_FCU_URL=serial:///dev/ttyTHS2:921600
+# Override both variables together when using another UART or a USB device.
+
+# ==================== ANCHORS/TEMPLATES ====================
+x-system-template: &system-template
+  working_dir: /workspace
+  # Host networking is required for ROS 1, ROS 2 DDS discovery, and optional
+  # MAVLink UDP endpoints shared with processes on the companion computer.
+  network_mode: host
+  ipc: host
+  restart: "no"
+  stdin_open: true
+  tty: true
+  environment:
+    - DISABLE_ROS1_EOL_WARNINGS=1
+
+x-robot-bringup-volume: &robot-bringup-volume
+  ./workspaces/robot_bringup:/workspace/src/robot_bringup:rw
+
+x-recorded-data-volume: &recorded-data-volume
+  ./data:/data:rw
+
+x-ros1-wait-for-roscore: &ros1-wait-for-roscore
+  depends_on:
+    ros1_launch_roscore:
+      condition: service_healthy
+
+x-ros1-launch-template: &ros1-launch-template
+  <<: [*system-template, *ros1-wait-for-roscore]
+  profiles: ["launch"]
+
+x-ros2-launch-template: &ros2-launch-template
+  <<: *system-template
+  profiles: ["launch"]
+
+# ==================== SERVICES ====================
+services:
+  # --- ROS 1/ROS 2 interoperability retained from the simulation setup ---
+  ros1_launch_roscore:
+    <<: *system-template
+    image: unified_autonomy:ros1_base
+    profiles: ["launch"]
+    command: roscore
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'source /opt/ros/noetic/setup.bash && rostopic list'"]
+      interval: 2s
+      timeout: 2s
+      retries: 5
+      start_period: 3s
+
+  ros1_launch_bridge_params:
+    <<: *ros1-launch-template
+    image: unified_autonomy:ros1_base
+    command: bash -c "roslaunch robot_bringup bridge_params.launch config_file:=uav_rmf"
+    volumes:
+      - *robot-bringup-volume
+      - *recorded-data-volume
+      - ./workspaces/ws_ros1_launcher:/workspace
+
+  ros2_launch_ros1_bridge:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_ros1_bridge
+    command: bash -c "ros2 run ros1_bridge parameter_bridge"
+    volumes:
+      - ./workspaces/ws_ros1_bridge:/workspace
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID:-0}
+    depends_on:
+      ros1_launch_roscore:
+        condition: service_healthy
+      ros1_launch_bridge_params:
+        condition: service_completed_successfully
+
+  # --- Real PX4 flight controller ---
+  # Wire the companion UART TX to PX4 TELEM2 RX, UART RX to TELEM2 TX, and
+  # connect ground. Configure PX4's TELEM2 MAVLink stream for Onboard mode at
+  # the same baud rate as MAVROS (921600 by default).
+  ros2_launch_mavros:
+    <<: *ros2-launch-template
+    # This existing image supplies the ROS 2 MAVROS node and GeographicLib
+    # data. PX4 SITL is not run by this service.
+    image: unified_autonomy:ros2_px4_sim
+    command: >-
+      bash -c "source /opt/ros/humble/setup.bash &&
+      ros2 run mavros mavros_node --ros-args
+      --params-file /workspace/src/robot_bringup/config/ros2/tl4q990_2/mavros_pluginlists.yaml
+      --params-file /opt/ros/humble/share/mavros/launch/px4_config.yaml
+      -p fcu_url:=${MAVROS_FCU_URL:-serial:///dev/ttyTHS2:921600}
+      -p tgt_system:=${MAVROS_TARGET_SYSTEM:-1}
+      -p tgt_component:=${MAVROS_TARGET_COMPONENT:-1}
+      -r __ns:=/mavros"
+    volumes:
+      - *robot-bringup-volume
+    devices:
+      - "${PX4_SERIAL_DEVICE:-/dev/ttyTHS2}:${PX4_SERIAL_DEVICE:-/dev/ttyTHS2}"
+    group_add:
+      - dialout
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID:-0}
+    healthcheck:
+      # Do not start mission transfer merely because the MAVROS process is
+      # alive: require a real heartbeat from the flight controller.
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c 'source /opt/ros/humble/setup.bash && timeout 8s ros2 topic echo --once /mavros/state mavros_msgs/msg/State | grep -q \"connected: true\"'",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+
+  # --- ETRO Origami mission data ---
+  # Upload geofences first. PX4 uses the same MAVLink mission-transfer state
+  # machine for geofences and ordinary missions, so these must stay serialized.
+  ros2_launch_nav_etro_origami_geofence:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_nav_etro_origami
+    user: "1000:1000"
+    depends_on:
+      ros2_launch_mavros:
+        condition: service_healthy
+    command: >-
+      ros2 launch nav_etro_origami geofence_uploader.launch.py
+      geojson_path:=${ETRO_GEOFENCE_GEOJSON:-/workspace/src/nav_etro_origami/config/input_trajectory/enghienTrajectory.geojson}
+      inflation_distance_m:=${ETRO_GEOFENCE_INFLATION_M:-5.0}
+    volumes:
+      - ./workspaces/ws_etro:/workspace
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID:-0}
+      - HOME=/tmp
+
+  ros2_launch_nav_etro_origami_waypoint:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_nav_etro_origami
+    user: "1000:1000"
+    depends_on:
+      ros2_launch_mavros:
+        condition: service_healthy
+      ros2_launch_nav_etro_origami_geofence:
+        condition: service_completed_successfully
+    command: >-
+      ros2 launch nav_etro_origami waypoint_uploader.launch.py
+      waypoint_file:=${WAYPOINTFILE:-/workspace/src/nav_etro_origami/config/waypoints_enghien.json}
+      launch_latitude:=${WAYPOINT_LAUNCH_LATITUDE:-50.665269}
+      launch_longitude:=${WAYPOINT_LAUNCH_LONGITUDE:-4.075979}
+      launch_altitude:=${WAYPOINT_LAUNCH_ALT:-10}
+    volumes:
+      - ./workspaces/ws_etro:/workspace
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID:-0}
+      - HOME=/tmp
