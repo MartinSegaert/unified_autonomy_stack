@@ -261,7 +261,7 @@ services:
         condition: service_healthy
     command: >-
       ros2 launch nav_etro_origami geofence_uploader.launch.py
-      geojson_path:=${ETRO_GEOFENCE_GEOJSON:-/workspace/src/nav_etro_origami/config/input_trajectory/exampleTrajectory.geojson}
+      geojson_path:=${ETRO_GEOFENCE_GEOJSON:-/workspace/src/nav_etro_origami/config/input_trajectory/enghienTrajectory.geojson}
       inflation_distance_m:=${ETRO_GEOFENCE_INFLATION_M:-0.0}
     volumes:
       - ./workspaces/ws_etro:/workspace
@@ -285,9 +285,9 @@ services:
         condition: service_completed_successfully
     command: >-
       ros2 launch nav_etro_origami waypoint_uploader.launch.py
-      waypoint_file:=${WAYPOINTFILE:-/workspace/src/nav_etro_origami/config/waypoints.json}
-      launch_latitude:=${WAYPOINT_LAUNCH_LATITUDE:-35.571199}
-      launch_longitude:=${WAYPOINT_LAUNCH_LONGITUDE:-24.175212}
+      waypoint_file:=${WAYPOINTFILE:-/workspace/src/nav_etro_origami/config/waypoints_enghien.json}
+      launch_latitude:=${WAYPOINT_LAUNCH_LATITUDE:-55.665407}
+      launch_longitude:=${WAYPOINT_LAUNCH_LONGITUDE:-4.075582}
       launch_altitude:=${WAYPOINT_LAUNCH_ALT:-10}
     volumes:
       - ./workspaces/ws_etro:/workspace
