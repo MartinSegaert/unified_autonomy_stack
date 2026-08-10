@@ -110,35 +110,6 @@ services:
   # *   ros2_launch service: ros2_launch_<workspace_name>
   # *   workspace folder: ws_<workspace_name>
 
-  # ==================== PLANNING ====================
-
-  # Planner
-  # --- GBPlanner ---
-  ros1_launch_gbplanner:
-    <<: [*ros1-launch-template]
-    image: unified_autonomy:ros1_gbplanner
-    command: roslaunch robot_bringup gbplanner_sim_px4.launch robot_name:=rmf config_name:=tl4q990_2 rviz_en:=true rviz_config:=/workspace/src/robot_bringup/rviz/ros1/custom_px4.rviz
-    volumes:
-      - *x11-volume
-      - ./workspaces/ws_gbplanner:/workspace
-      - *robot-bringup-volume
-    devices:
-      - /dev/dri:/dev/dri
-    deploy:  # Add this section
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
-  ros1_launch_waypoint_follower:
-    <<: [*ros1-launch-template]
-    image: unified_autonomy:ros1_gbplanner
-    command: roslaunch robot_bringup waypoint_follower.launch autostart:=true
-    volumes:
-      - ./workspaces/ws_gbplanner:/workspace
-      - *robot-bringup-volume
 
   # ==================== SIMULATION ====================
 
@@ -274,45 +245,6 @@ services:
       retries: 30
       start_period: 10s
 
-  # The existing NMPC simulation interface emits geometry_msgs/Twist. Convert
-  # it to MAVLink acceleration setpoints and expose MAVROS odometry under the
-  # robot topic expected by the rest of this stack.
-  ros2_launch_px4_mavros_bridge:
-    <<: *ros2-launch-template
-    image: unified_autonomy:ros2_px4_sim
-    depends_on:
-      ros2_launch_mavros:
-        condition: service_healthy
-    command: >
-      python3 /workspace/src/robot_bringup/scripts/ros2/px4_mavros_bridge.py
-      --ros-args
-      -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/rmf/cmd/acc}
-      -p controller_ready_topic:=${PX4_CONTROLLER_READY_TOPIC:-/rmf/cmd/acc}
-      -p controller_hold_service:=${PX4_CONTROLLER_HOLD_SERVICE:-/sdf_nmpc/hover}
-      -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
-      -p body_frame_id:=${PX4_BODY_FRAME:-base_link}
-      -p use_sim_time:=true
-      -p publish_tf:=${PX4_PUBLISH_TF:-true}
-      -p stamp_tf_with_ros_time:=${PX4_STAMP_TF_WITH_ROS_TIME:-true}
-      -p tf_parent_frame_id:=${PX4_TF_PARENT_FRAME:-world}
-      -p tf_child_frame_id:=${PX4_TF_CHILD_FRAME:-base_link}
-      -p publish_lidar_tf:=${PX4_PUBLISH_LIDAR_TF:-true}
-      -p lidar_parent_frame_id:=${PX4_LIDAR_PARENT_FRAME:-base_link}
-      -p lidar_child_frame_id:=${PX4_LIDAR_CHILD_FRAME:-lidar_link}
-      -p lidar_model_sdf_path:=${PX4_LIDAR_MODEL_SDF_PATH:-/workspace/src/robot_bringup/gz/models/tl4q990_3d_lidar_2/model.sdf}
-      -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
-      -p auto_arm:=${PX4_AUTO_ARM:-true}
-      -p auto_takeoff:=${PX4_AUTO_TAKEOFF:-true}
-      -p takeoff_handover_altitude:=${PX4_TAKEOFF_ALTITUDE:-2.0}
-      -p takeoff_altitude_tolerance:=${PX4_TAKEOFF_TOLERANCE:-0.2}
-      -p takeoff_hold_mode:=${PX4_TAKEOFF_HOLD_MODE:-AUTO.LOITER}
-      -p mode_request_period_s:=${PX4_MODE_REQUEST_PERIOD:-0.5}
-    volumes:
-      - *robot-bringup-volume
-    environment:
-      - ROS_DOMAIN_ID=${DOMAIN_ID}
-
-
   ## ETRO NAV ##
 
   # One-shot conversion and upload of all GeoJSON no-fly zones. The node sends
@@ -320,6 +252,10 @@ services:
   ros2_launch_nav_etro_origami_geofence:
     <<: *ros2-launch-template
     image: unified_autonomy:ros2_nav_etro_origami
+    # MAVROS runs as developer (UID/GID 1000). Fast DDS shared-memory endpoints
+    # are user-protected, so the client must use the same IDs when ipc: host is
+    # enabled. /tmp gives the non-root process a writable ROS log directory.
+    user: "1000:1000"
     depends_on:
       ros2_launch_mavros:
         condition: service_healthy
@@ -330,3 +266,4 @@ services:
       - ./workspaces/ws_etro:/workspace
     environment:
       - ROS_DOMAIN_ID=${DOMAIN_ID}
+      - HOME=/tmp

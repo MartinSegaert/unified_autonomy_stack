@@ -42,25 +42,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zip \
     && rm -rf /var/lib/apt/lists/*
 
-# diagnostic_updater 4.0.6 is header-only, but the current Humble MAVROS
-# package still links against its former shared-library ABI. Build the two
-# inline symbols MAVROS needs into the expected SONAME.
-COPY docker/diagnostic_updater_abi_compat.cpp /tmp/
-RUN bash -c 'source /opt/ros/humble/setup.bash && \
-    include_flags=(-I/opt/ros/humble/include); \
-    for include_dir in /opt/ros/humble/include/*; do \
-      [ -d "$include_dir" ] && include_flags+=("-I$include_dir"); \
-    done; \
-    g++ -std=c++17 -fPIC -shared \
-      -Wl,-soname,libdiagnostic_updater.so \
-      "${include_flags[@]}" \
-      /tmp/diagnostic_updater_abi_compat.cpp \
-      -L/opt/ros/humble/lib \
-      -lrclcpp \
-      -ldiagnostic_msgs__rosidl_typesupport_cpp \
-      -o /opt/ros/humble/lib/libdiagnostic_updater.so; \
-    rm /tmp/diagnostic_updater_abi_compat.cpp'
-
 # MAVROS requires the GeographicLib geoid datasets at runtime. The installer
 # is supplied by the ros-humble-mavros package above.
 RUN /opt/ros/humble/lib/mavros/install_geographiclib_datasets.sh
