@@ -13,3 +13,6 @@
 [submodule "workspaces/ws_nmpc/src/sdf_nmpc_ros"]
 	path = workspaces/ws_nmpc/src/sdf_nmpc_ros
 	url = git@github.com:ntnu-arl/sdf_nmpc_ros.git
+[submodule "workspaces/ws_etro/src/nav_etro_origami"]
+	path = workspaces/ws_etro/src/nav_etro_origami
+	url = git@github.com:MartinSegaert/nav_etro_origami.git
