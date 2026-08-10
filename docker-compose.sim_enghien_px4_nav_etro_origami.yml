@@ -118,20 +118,15 @@ services:
     <<: [*ros2-launch-template]
     image: unified_autonomy:ros2_sim
     runtime: nvidia
-    # Start only the Crete world. PX4 SITL spawns and controls the TL4Q990-class vehicle.
+    # Start only the empty world. PX4 SITL spawns and controls the TL4Q990-class vehicle.
     command: >-
-      ros2 launch robot_bringup uav_sim_crete_px4.launch.xml
+      ros2 launch /workspace/src/nav_etro_origami/launch/uav_sim_px4.launch.xml
       headless:=${GZ_HEADLESS:-false}
-      robot_name:=tl4q990_3d_lidar_2
-      lidar_horizontal_min_angle:=0.0
-      lidar_horizontal_max_angle:=6.28
-      lidar_vertical_min_angle:=-0.13
-      lidar_vertical_max_angle:=0.96
-    # TODO : Make min/max angles read from model.sdf
     privileged: true
     volumes:
       - *x11-volume
       - ./workspaces/ws_sim:/workspace
+      - ./workspaces/ws_etro/src/nav_etro_origami:/workspace/src/nav_etro_origami:ro
       - *robot-bringup-volume
       # PX4 sends Gazebo an SDF include containing this absolute path. Mount it
       # at the same location in both the Gazebo and PX4 containers.
@@ -196,7 +191,7 @@ services:
       # In standalone mode this path must be supplied explicitly so the SDF
       # include sent to the Gazebo container is an absolute, shared path.
       - PX4_GZ_MODELS=/repo/workspaces/PX4/Tools/simulation/gz/models
-      # The Crete SDF world is named 'map', not 'crete'. Without this override
+      # The empty SDF world is named 'map'. Without this override
       # the TL4Q990-class vehicle airframe defaults to a world named 'default'.
       - PX4_GZ_WORLD=map
       - PX4_GZ_MODEL_POSE=${PX4_GZ_MODEL_POSE:-0,0,0,0,0,0}
@@ -262,7 +257,7 @@ services:
     command: >-
       ros2 launch nav_etro_origami geofence_uploader.launch.py
       geojson_path:=${ETRO_GEOFENCE_GEOJSON:-/workspace/src/nav_etro_origami/config/input_trajectory/enghienTrajectory.geojson}
-      inflation_distance_m:=${ETRO_GEOFENCE_INFLATION_M:-0.0}
+      inflation_distance_m:=${ETRO_GEOFENCE_INFLATION_M:-5.0}
     volumes:
       - ./workspaces/ws_etro:/workspace
     environment:
@@ -286,8 +281,8 @@ services:
     command: >-
       ros2 launch nav_etro_origami waypoint_uploader.launch.py
       waypoint_file:=${WAYPOINTFILE:-/workspace/src/nav_etro_origami/config/waypoints_enghien.json}
-      launch_latitude:=${WAYPOINT_LAUNCH_LATITUDE:-55.665407}
-      launch_longitude:=${WAYPOINT_LAUNCH_LONGITUDE:-4.075582}
+      launch_latitude:=${WAYPOINT_LAUNCH_LATITUDE:-50.665269}
+      launch_longitude:=${WAYPOINT_LAUNCH_LONGITUDE:-4.075979}
       launch_altitude:=${WAYPOINT_LAUNCH_ALT:-10}
     volumes:
       - ./workspaces/ws_etro:/workspace
