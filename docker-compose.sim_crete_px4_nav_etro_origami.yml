@@ -262,6 +262,7 @@ services:
     command: >-
       ros2 launch nav_etro_origami geofence_uploader.launch.py
       geojson_path:=${ETRO_GEOFENCE_GEOJSON:-/workspace/src/nav_etro_origami/config/input_trajectory/exampleTrajectory.geojson}
+      inflation_distance_m:=${ETRO_GEOFENCE_INFLATION_M:-50.0}
     volumes:
       - ./workspaces/ws_etro:/workspace
     environment:

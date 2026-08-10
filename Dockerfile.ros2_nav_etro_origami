@@ -9,6 +9,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 # base currently provides rclpy, launch_ros, ament Python, and mavros_msgs.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-pytest \
+        python3-shapely \
         ros-humble-ament-cmake-pytest \
         ros-humble-mavros-msgs \
     && rm -rf /var/lib/apt/lists/*
