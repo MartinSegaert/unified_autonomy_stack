@@ -1,0 +1,18 @@
+# Dependency image for every ROS 2 package in the ws_etro navigation workspace.
+# Source and colcon outputs remain in the bind-mounted workspace, matching the
+# other workspace images in this repository.
+FROM unified_autonomy:ros2_base
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Keep package-specific runtime/build dependencies here as ws_etro grows. The
+# base currently provides rclpy, launch_ros, ament Python, and mavros_msgs.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-pytest \
+        ros-humble-ament-cmake-pytest \
+        ros-humble-mavros-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]

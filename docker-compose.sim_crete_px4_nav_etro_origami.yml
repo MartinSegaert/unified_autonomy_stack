@@ -1,0 +1,332 @@
+# ==================== ANCHORS/TEMPLATES ====================
+x-system-template: &system-template
+  # runtime: nvidia
+  working_dir: /workspace
+  network_mode: host
+  ipc: host
+  restart: "no"
+  stdin_open: true
+  tty: true
+  environment:
+  - DISPLAY=${DISPLAY:-:0}
+  - NVIDIA_VISIBLE_DEVICES=all
+  - NVIDIA_DRIVER_CAPABILITIES=all
+  - QT_X11_NO_MITSHM=1
+  - DISABLE_ROS1_EOL_WARNINGS=1
+  volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+
+x-x11-volume: &x11-volume
+  /tmp/.X11-unix:/tmp/.X11-unix:rw
+
+x-robot-bringup-volume: &robot-bringup-volume
+  ./workspaces/robot_bringup:/workspace/src/robot_bringup:rw
+
+# ROS 2 package discovery resolves robot_bringup to the workspace's installed
+# share directory.  Mount the live configs there as well, otherwise configs
+# added after the image was built (such as tl4q990_2/) are invisible to nodes
+# using get_package_share_directory().
+x-robot-bringup-installed-config-volume: &robot-bringup-installed-config-volume
+  ./workspaces/robot_bringup/config:/workspace/install/robot_bringup/share/robot_bringup/config:ro
+
+x-recorded-data-volume: &recorded-data-volume
+  ./data:/data:rw
+
+x-catkin-build-template: &catkin-build-template
+  <<: *system-template
+  command: catkin build -DCMAKE_BUILD_TYPE=Release
+  profiles: ["build"]
+
+x-colcon-build-template: &colcon-build-template
+  <<: *system-template
+  command: colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release #TODO number of cores, check config file in magpie for colcon defaults
+  profiles: ["build"]
+
+x-ros1-wait-for-roscore: &ros1-wait-for-roscore
+  depends_on:
+    ros1_launch_roscore:
+      condition: service_healthy
+
+x-ros1-launch-template: &ros1-launch-template
+  <<: [*system-template, *ros1-wait-for-roscore]
+  profiles: ["launch"]
+
+x-ros2-launch-template: &ros2-launch-template
+  <<: [*system-template]
+  profiles: ["launch"]
+
+# ==================== SERVICES ====================
+
+services:
+  # # ==================== UTILITIES ====================
+
+  # --- ROScore (needed for centralized roscore) ---
+  ros1_launch_roscore:
+    <<: [*system-template]
+    image: unified_autonomy:ros1_base
+    profiles: ["launch"]
+    command: roscore
+    healthcheck:
+      test: ["CMD-SHELL", "bash", "-c", "source /opt/ros/noetic/setup.bash && rostopic list || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 5
+      start_period: 3s  # Give it time to start before checking
+  
+  ros1_launch_bridge_params:
+    <<: [*ros1-launch-template]
+    image: unified_autonomy:ros1_base
+    command: bash -c "roslaunch robot_bringup bridge_params.launch config_file:=uav_rmf"
+    volumes:
+      - *robot-bringup-volume
+      - *recorded-data-volume
+      - ./workspaces/ws_ros1_launcher:/workspace # TODO: This is a hack to get a workspace mounted which has the robot bringup package built.
+
+  
+  ros2_launch_ros1_bridge:
+    <<: [*ros2-launch-template]
+    image: unified_autonomy:ros2_ros1_bridge
+    # command: ros2 run ros1_bridge dynamic_bridge #TODO: set this as a static bridge which is actually a param bridge file -check new magpie for this/
+    command: bash -c "ros2 run ros1_bridge parameter_bridge"
+    # command: bash -c "ros2 run ros1_bridge parameter_bridge --bridge-tf-frames "map" "rmf" "rmf/base_link/lidar""
+    volumes:
+      - ./workspaces/ws_ros1_bridge:/workspace
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+    depends_on:
+      ros1_launch_roscore:
+        condition: service_healthy
+      ros1_launch_bridge_params:
+        condition: service_completed_successfully
+
+  # ==================== CODE ====================
+  # * Each workspace is built and launched in its own service
+  # * Convenience common map merges are provided for the expected standard use cases
+  # * eg. <<: [*catkin-build-template] to inherit common build settings, <<: [*ros1-launch-template]
+  # * to inherit common ros 1launch settings ...
+  # * Naming convention:
+  # *   build service: build_<workspace_name>
+  # *   ros1_launch service: ros1_launch_<workspace_name>
+  # *   ros2_launch service: ros2_launch_<workspace_name>
+  # *   workspace folder: ws_<workspace_name>
+
+  # ==================== PLANNING ====================
+
+  # Planner
+  # --- GBPlanner ---
+  ros1_launch_gbplanner:
+    <<: [*ros1-launch-template]
+    image: unified_autonomy:ros1_gbplanner
+    command: roslaunch robot_bringup gbplanner_sim_px4.launch robot_name:=rmf config_name:=tl4q990_2 rviz_en:=true rviz_config:=/workspace/src/robot_bringup/rviz/ros1/custom_px4.rviz
+    volumes:
+      - *x11-volume
+      - ./workspaces/ws_gbplanner:/workspace
+      - *robot-bringup-volume
+    devices:
+      - /dev/dri:/dev/dri
+    deploy:  # Add this section
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  ros1_launch_waypoint_follower:
+    <<: [*ros1-launch-template]
+    image: unified_autonomy:ros1_gbplanner
+    command: roslaunch robot_bringup waypoint_follower.launch autostart:=true
+    volumes:
+      - ./workspaces/ws_gbplanner:/workspace
+      - *robot-bringup-volume
+
+  # ==================== SIMULATION ====================
+
+  # --- Simulation ---
+  ros2_launch_uav_sim:
+    <<: [*ros2-launch-template]
+    image: unified_autonomy:ros2_sim
+    runtime: nvidia
+    # Start only the Crete world. PX4 SITL spawns and controls the TL4Q990-class vehicle.
+    command: >-
+      ros2 launch robot_bringup uav_sim_crete_px4.launch.xml
+      headless:=${GZ_HEADLESS:-false}
+      robot_name:=tl4q990_3d_lidar_2
+      lidar_horizontal_min_angle:=0.0
+      lidar_horizontal_max_angle:=6.28
+      lidar_vertical_min_angle:=-0.13
+      lidar_vertical_max_angle:=0.96
+    # TODO : Make min/max angles read from model.sdf
+    privileged: true
+    volumes:
+      - *x11-volume
+      - ./workspaces/ws_sim:/workspace
+      - *robot-bringup-volume
+      # PX4 sends Gazebo an SDF include containing this absolute path. Mount it
+      # at the same location in both the Gazebo and PX4 containers.
+      - ./workspaces/PX4:/repo/workspaces/PX4:ro
+      - ./workspaces/robot_bringup/gz/models/tl4q990_3d_lidar_2:/repo/workspaces/PX4/Tools/simulation/gz/models/tl4q990_3d_lidar_2:ro
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+      - DISPLAY=${DISPLAY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - __NV_PRIME_RENDER_OFFLOAD=${__NV_PRIME_RENDER_OFFLOAD:-1}
+      - __GLX_VENDOR_LIBRARY_NAME=${__GLX_VENDOR_LIBRARY_NAME:-nvidia}
+      - LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-0}
+      # Explicit values are required for Gazebo Transport discovery across
+      # containers, even though both services use the host network.
+      - GZ_PARTITION=${GZ_PARTITION:-uas_px4_crete}
+      - GZ_IP=127.0.0.1
+    healthcheck:
+      # Gazebo Transport discovery can exceed Docker's short health timeout.
+      # PX4 performs its own /world/map/scene/info readiness check before it
+      # spawns the vehicle, so container health only needs server liveness.
+      test: ["CMD-SHELL", "pgrep -f 'gz sim server' >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 10s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # PX4 owns the TL4Q990-class vehicle attitude/rate/motor control and communicates with
+  # Gazebo directly over gz-transport. The first launch builds px4_sitl_default
+  # in the mounted submodule; subsequent launches reuse workspaces/PX4/build.
+  ros2_launch_px4_sitl:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_px4_sim
+    command: bash -c "cd /repo/workspaces/PX4 && make px4_sitl gz_tl4q990_3d_lidar_2"
+    depends_on:
+      ros2_launch_uav_sim:
+        # PX4_GZ_STANDALONE invokes PX4's own scene/info readiness loop. Start
+        # PX4 as soon as Gazebo starts so a brittle Compose probe can never
+        # prevent the model-spawn code from running.
+        condition: service_started
+    volumes:
+      - ./workspaces/PX4:/repo/workspaces/PX4:rw
+      # workspaces/PX4 is a git submodule. Its .git file contains
+      # "gitdir: ../../.git/modules/workspaces/PX4" and its metadata records
+      # a ../../../../workspaces/PX4 worktree. Mounting both below /repo keeps
+      # those relative paths valid inside the container.
+      - ./.git/modules/workspaces/PX4:/repo/.git/modules/workspaces/PX4:ro
+      - ./workspaces/robot_bringup/gz/models/tl4q990_3d_lidar_2:/repo/workspaces/PX4/Tools/simulation/gz/models/tl4q990_3d_lidar_2:ro
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+      - PX4_GZ_STANDALONE=1
+      # px4-rc.gzsim only sources gz_env.sh when PX4 starts Gazebo itself.
+      # In standalone mode this path must be supplied explicitly so the SDF
+      # include sent to the Gazebo container is an absolute, shared path.
+      - PX4_GZ_MODELS=/repo/workspaces/PX4/Tools/simulation/gz/models
+      # The Crete SDF world is named 'map', not 'crete'. Without this override
+      # the TL4Q990-class vehicle airframe defaults to a world named 'default'.
+      - PX4_GZ_WORLD=map
+      - PX4_GZ_MODEL_POSE=${PX4_GZ_MODEL_POSE:-0,0,0,0,0,0}
+      - PX4_GZ_NO_FOLLOW=${PX4_GZ_NO_FOLLOW:-1}
+      - GIT_SUBMODULES_ARE_EVIL=1
+      - GZ_PARTITION=${GZ_PARTITION:-uas_px4_crete}
+      - GZ_IP=127.0.0.1
+    healthcheck:
+      # PX4 appends its zero-based instance index to every spawned model name.
+      # Thus PX4_SIM_MODEL=gz_tl4q990_3d_lidar_2 produces tl4q990_3d_lidar_2_0.
+      test: ["CMD-SHELL", "topics=$$(gz topic -l) && echo \"$$topics\" | grep -q '/world/map/model/tl4q990_3d_lidar_2_0/link/base_link/sensor/imu_sensor/imu' && echo \"$$topics\" | grep -q '/world/map/model/tl4q990_3d_lidar_2_0/link/base_link/sensor/air_pressure_sensor/air_pressure' && echo \"$$topics\" | grep -q '/world/map/model/tl4q990_3d_lidar_2_0/link/base_link/sensor/magnetometer_sensor/magnetometer' && echo \"$$topics\" | grep -q '/world/map/model/tl4q990_3d_lidar_2_0/link/base_link/sensor/navsat_sensor/navsat'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 180s
+    stop_grace_period: 10s
+
+  # MAVROS binds the port to which PX4's first SITL instance sends its
+  # offboard MAVLink stream (PX4 local 14580 -> MAVROS local 14540).
+  ros2_launch_mavros:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_px4_sim
+    depends_on:
+      ros2_launch_px4_sitl:
+        condition: service_healthy
+    command: >
+      bash -c "source /opt/ros/humble/setup.bash &&
+      ros2 run mavros mavros_node --ros-args
+      --params-file /workspace/src/robot_bringup/config/ros2/tl4q990_2/mavros_pluginlists.yaml
+      --params-file /opt/ros/humble/share/mavros/launch/px4_config.yaml
+      -p fcu_url:=udp://0.0.0.0:14540@127.0.0.1:14580
+      -p tgt_system:=1
+      -p tgt_component:=1
+      -r __ns:=/mavros"
+    volumes:
+      - *robot-bringup-volume
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+    healthcheck:
+      # A new `ros2 topic echo` process can exceed Docker's timeout while DDS
+      # discovery warms up even though MAVROS is already connected. Gate the
+      # bridge on node liveness; it can safely wait for the first FCU heartbeat.
+      test: ["CMD-SHELL", "pgrep -f '/opt/ros/humble/lib/mavros/mavros_node' >/dev/null"]
+      interval: 5s
+      timeout: 2s
+      retries: 30
+      start_period: 10s
+
+  # The existing NMPC simulation interface emits geometry_msgs/Twist. Convert
+  # it to MAVLink acceleration setpoints and expose MAVROS odometry under the
+  # robot topic expected by the rest of this stack.
+  ros2_launch_px4_mavros_bridge:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_px4_sim
+    depends_on:
+      ros2_launch_mavros:
+        condition: service_healthy
+    command: >
+      python3 /workspace/src/robot_bringup/scripts/ros2/px4_mavros_bridge.py
+      --ros-args
+      -p accel_input_topic:=${PX4_ACCEL_TOPIC:-/rmf/cmd/acc}
+      -p controller_ready_topic:=${PX4_CONTROLLER_READY_TOPIC:-/rmf/cmd/acc}
+      -p controller_hold_service:=${PX4_CONTROLLER_HOLD_SERVICE:-/sdf_nmpc/hover}
+      -p odom_output_topic:=${PX4_ODOM_TOPIC:-/rmf/odom}
+      -p body_frame_id:=${PX4_BODY_FRAME:-base_link}
+      -p use_sim_time:=true
+      -p publish_tf:=${PX4_PUBLISH_TF:-true}
+      -p stamp_tf_with_ros_time:=${PX4_STAMP_TF_WITH_ROS_TIME:-true}
+      -p tf_parent_frame_id:=${PX4_TF_PARENT_FRAME:-world}
+      -p tf_child_frame_id:=${PX4_TF_CHILD_FRAME:-base_link}
+      -p publish_lidar_tf:=${PX4_PUBLISH_LIDAR_TF:-true}
+      -p lidar_parent_frame_id:=${PX4_LIDAR_PARENT_FRAME:-base_link}
+      -p lidar_child_frame_id:=${PX4_LIDAR_CHILD_FRAME:-lidar_link}
+      -p lidar_model_sdf_path:=${PX4_LIDAR_MODEL_SDF_PATH:-/workspace/src/robot_bringup/gz/models/tl4q990_3d_lidar_2/model.sdf}
+      -p auto_offboard:=${PX4_AUTO_OFFBOARD:-true}
+      -p auto_arm:=${PX4_AUTO_ARM:-true}
+      -p auto_takeoff:=${PX4_AUTO_TAKEOFF:-true}
+      -p takeoff_handover_altitude:=${PX4_TAKEOFF_ALTITUDE:-2.0}
+      -p takeoff_altitude_tolerance:=${PX4_TAKEOFF_TOLERANCE:-0.2}
+      -p takeoff_hold_mode:=${PX4_TAKEOFF_HOLD_MODE:-AUTO.LOITER}
+      -p mode_request_period_s:=${PX4_MODE_REQUEST_PERIOD:-0.5}
+    volumes:
+      - *robot-bringup-volume
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
+
+
+  ## ETRO NAV ##
+
+  # One-shot conversion and upload of all GeoJSON no-fly zones. The node sends
+  # one full-list request; MAVROS handles the item-by-item MAVLink handshake.
+  ros2_launch_nav_etro_origami_geofence:
+    <<: *ros2-launch-template
+    image: unified_autonomy:ros2_nav_etro_origami
+    depends_on:
+      ros2_launch_mavros:
+        condition: service_healthy
+    command: >-
+      ros2 launch nav_etro_origami geofence_uploader.launch.py
+      geojson_path:=${ETRO_GEOFENCE_GEOJSON:-/workspace/src/nav_etro_origami/config/input_trajectory/exampleTrajectory.geojson}
+    volumes:
+      - ./workspaces/ws_etro:/workspace
+    environment:
+      - ROS_DOMAIN_ID=${DOMAIN_ID}
